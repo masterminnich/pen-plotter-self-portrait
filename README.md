@@ -1,10 +1,10 @@
-Pen-Plot Portrait — Camera to SVG
+Pen-Plot Self-Portrait
 
 This is a small client-side web app that:
 - uses your camera to take a selfie
 - runs person segmentation (BodyPix) to remove the background
 - vectorizes the person into an SVG using ImageTracer
-- offers three styles: Outline, Pixelated, Squiggly
+- offers many styles
 - exports an SVG with stroke-only black paths suitable for pen plotting
 
 Quick start (from the folder that contains these files):
@@ -21,10 +21,8 @@ python -m http.server 8000
 Notes:
 - Model files (BodyPix) are downloaded from CDN at runtime — first run may be slow.
 - This is a client-only demo; no images are uploaded to any server.
-- For better pen-plot output you may tweak `Detail` and try different styles.
 
 Files:
 - index.html — main UI
 - style.css — simple styling
 - app.js — logic: camera, segmentation, vectorization, download
-
