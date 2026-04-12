@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pen-Plot Portrait — Camera to SVG</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main>
+    <h1>Pen Plotter Self-Portrait</h1>
+
+    <div class="controls">
+      <div class="mode-toggle">
+        <button id="mode-camera" class="mode-btn active">Camera</button>
+        <button id="mode-upload" class="mode-btn">Upload</button>
+      </div>
+      <input type="file" id="file-upload" accept="image/*" style="display:none">
+      <button id="upload-btn" style="display:none">Choose Image</button>
+      <button id="start-camera">Start Camera</button>
+      <button id="take-photo" disabled>Freeze</button>
+      <select id="style-select">
+        <option value="outline">Outline</option>
+        <option value="blueprint">Technical Blueprint</option>
+        <option value="topo">Topographic</option>
+        <option value="constellation">Constellation</option>
+        <option value="pinwheel">Pinwheel</option>
+        <option value="pixel">Pixelated</option>
+        <option value="squiggle">Squiggly</option>
+        <option value="invader">Alien Invaders</option>
+        <option value="sobel">Sobel</option>
+        <option value="spiral">Spiral Iris</option>
+        <option value="wiggle">Wiggle</option>
+        <option value="shards">Shards</option>
+        <option value="composition">Bauhaus Composition</option>
+      </select>
+      <label>Detail: <input id="detail" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+      <button id="download-svg" disabled>Download SVG</button>
+    </div>
+
+    <div class="viewport">
+      <section id="camera-section">
+        <h2 id="source-label">Camera</h2>
+        <div class="video-container">
+          <video id="video" autoplay playsinline></video>
+          <img id="uploaded-image" style="display:none; max-width:100%; max-height:100%; object-fit:contain;">
+        </div>
+      </section>
+
+      <section id="preview-section">
+        <h2>Output</h2>
+        <div id="preview"></div>
+      </section>
+    </div>
+
+    <canvas id="capture-canvas" width="640" height="480" style="display:none"></canvas>
+  </main>
+
+  <!-- TensorFlow.js + BodyPix (segmentation) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.9.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.0.5/dist/body-pix.min.js"></script>
+  <!-- ImageTracer for vectorization -->
+  <script src="https://unpkg.com/imagetracerjs@1.2.4/imagetracer_v1.2.4.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
