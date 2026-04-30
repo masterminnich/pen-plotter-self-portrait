@@ -31,7 +31,7 @@ async function init() {
   detailRange = document.getElementById('detail');
   preview = document.getElementById('preview');
   canvas = document.getElementById('capture-canvas');
-  ctx = canvas.getContext('2d');
+  ctx = canvas.getContext('2d', { willReadFrequently: true });
 
   // Mode/upload elements
   fileInput = document.getElementById('file-upload');
@@ -184,7 +184,7 @@ async function processUploadedImage() {
   const outCanvas = document.createElement('canvas');
   outCanvas.width = w;
   outCanvas.height = h;
-  const outCtx = outCanvas.getContext('2d');
+  const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
   outCtx.putImageData(imgData, 0, 0);
   
   const style = styleSelect.value;
@@ -195,13 +195,13 @@ async function processUploadedImage() {
     const tiny = document.createElement('canvas');
     tiny.width = px;
     tiny.height = Math.round(px * h / w);
-    const tctx = tiny.getContext('2d');
+    const tctx = tiny.getContext('2d', { willReadFrequently: true });
     tctx.imageSmoothingEnabled = false;
     tctx.drawImage(outCanvas, 0, 0, tiny.width, tiny.height);
     const scaled = document.createElement('canvas');
     scaled.width = w;
     scaled.height = h;
-    const sctx = scaled.getContext('2d');
+    const sctx = scaled.getContext('2d', { willReadFrequently: true });
     sctx.imageSmoothingEnabled = false;
     sctx.drawImage(tiny, 0, 0, w, h);
     await generateSVGFromCanvasAsync(scaled, style, detail);
@@ -259,7 +259,7 @@ async function processFrame() {
 
   const outCanvas = document.createElement('canvas');
   outCanvas.width = w; outCanvas.height = h;
-  const outCtx = outCanvas.getContext('2d');
+  const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
   outCtx.putImageData(imgData, 0, 0);
 
   const style = styleSelect.value;
@@ -269,11 +269,11 @@ async function processFrame() {
     const px = Math.max(24, Math.floor(64 + detail * 256));
     const tiny = document.createElement('canvas');
     tiny.width = px; tiny.height = Math.round(px * h / w);
-    const tctx = tiny.getContext('2d');
+    const tctx = tiny.getContext('2d', { willReadFrequently: true });
     tctx.imageSmoothingEnabled = false;
     tctx.drawImage(outCanvas, 0, 0, tiny.width, tiny.height);
     const scaled = document.createElement('canvas'); scaled.width = w; scaled.height = h;
-    const sctx = scaled.getContext('2d'); sctx.imageSmoothingEnabled = false;
+    const sctx = scaled.getContext('2d', { willReadFrequently: true }); sctx.imageSmoothingEnabled = false;
     sctx.drawImage(tiny, 0, 0, w, h);
     await generateSVGFromCanvasAsync(scaled, style, detail);
   } else {
@@ -292,7 +292,7 @@ function takePhoto() {
 function generateShatteredGlass(sourceCanvas, detail) {
   const w = sourceCanvas.width;
   const h = sourceCanvas.height;
-  const tctx = sourceCanvas.getContext('2d');
+  const tctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
   const imgData = tctx.getImageData(0, 0, w, h).data;
   const paths = [];
 
@@ -330,7 +330,7 @@ function generateShatteredGlass(sourceCanvas, detail) {
 }
 
 function generateShatteredGlass2(x, y, w, h, canvas, paths, detail) {
-  const tctx = canvas.getContext('2d');
+  const tctx = canvas.getContext('2d', { willReadFrequently: true });
   // Ensure we don't try to sample a 0-pixel area
   const sampleW = Math.max(1, Math.floor(w));
   const sampleH = Math.max(1, Math.floor(h));
@@ -380,7 +380,7 @@ function rand(range) {
 function generateComposition(sourceCanvas, detail) {
   const w = sourceCanvas.width;
   const h = sourceCanvas.height;
-  const tctx = sourceCanvas.getContext('2d');
+  const tctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
   const imgData = tctx.getImageData(0, 0, w, h).data;
   const paths = [];
 
@@ -436,7 +436,7 @@ function generateComposition(sourceCanvas, detail) {
 function generateShards(sourceCanvas, detail) {
   const w = sourceCanvas.width;
   const h = sourceCanvas.height;
-  const tctx = sourceCanvas.getContext('2d');
+  const tctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
   const imgData = tctx.getImageData(0, 0, w, h).data;
   const paths = [];
 
@@ -496,7 +496,7 @@ function generateShards(sourceCanvas, detail) {
 function generateWiggles(sourceCanvas, detail) {
   const w = sourceCanvas.width;
   const h = sourceCanvas.height;
-  const tctx = sourceCanvas.getContext('2d');
+  const tctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
   const imgData = tctx.getImageData(0, 0, w, h).data;
   const paths = [];
 
@@ -544,7 +544,7 @@ function generateWiggles(sourceCanvas, detail) {
 function generateInvaders(sourceCanvas, detail) {
   const w = sourceCanvas.width;
   const h = sourceCanvas.height;
-  const tctx = sourceCanvas.getContext('2d');
+  const tctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
   const imgData = tctx.getImageData(0, 0, w, h).data;
   const paths = [];
 
@@ -585,7 +585,7 @@ function generateInvaders(sourceCanvas, detail) {
 function generatePinwheel(sourceCanvas, detail) {
   const w = sourceCanvas.width;
   const h = sourceCanvas.height;
-  const tctx = sourceCanvas.getContext('2d');
+  const tctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
   const imgData = tctx.getImageData(0, 0, w, h).data;
   const paths = [];
 
@@ -637,7 +637,7 @@ function generatePinwheel(sourceCanvas, detail) {
 function generateBlueprint(sourceCanvas, detail) {
   const w = sourceCanvas.width;
   const h = sourceCanvas.height;
-  const tctx = sourceCanvas.getContext('2d');
+  const tctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
   const imgData = tctx.getImageData(0, 0, w, h).data;
   const paths = [];
 
@@ -683,7 +683,7 @@ function generateBlueprint(sourceCanvas, detail) {
 function generateConstellation(sourceCanvas, detail) {
   const w = sourceCanvas.width;
   const h = sourceCanvas.height;
-  const tctx = sourceCanvas.getContext('2d');
+  const tctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
   const imgData = tctx.getImageData(0, 0, w, h).data;
   const paths = [];
   
@@ -735,7 +735,7 @@ function generateConstellation(sourceCanvas, detail) {
 function generateTopoLines(sourceCanvas, detail) {
   const w = sourceCanvas.width;
   const h = sourceCanvas.height;
-  const tctx = sourceCanvas.getContext('2d');
+  const tctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
   const imgData = tctx.getImageData(0, 0, w, h).data;
   const paths = [];
 
@@ -889,7 +889,7 @@ function generateSVGFromCanvasAsync(sourceCanvas, style, detail) {
 function generateSpiralLines(sourceCanvas, detail) {
   const w = sourceCanvas.width;
   const h = sourceCanvas.height;
-  const tctx = sourceCanvas.getContext('2d');
+  const tctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
   const imgData = tctx.getImageData(0, 0, w, h).data;
   
   const centerX = w / 2;
@@ -940,7 +940,7 @@ function generateSpiralLines(sourceCanvas, detail) {
 function generateSobelLines(sourceCanvas, detail) {
   const w = sourceCanvas.width;
   const h = sourceCanvas.height;
-  const tctx = sourceCanvas.getContext('2d');
+  const tctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
   const imgData = tctx.getImageData(0, 0, w, h).data;
   const paths = [];
 
@@ -987,7 +987,7 @@ function generateSobelLines(sourceCanvas, detail) {
 function generateSquiggleLines(sourceCanvas, detail) {
   const w = sourceCanvas.width;
   const h = sourceCanvas.height;
-  const tctx = sourceCanvas.getContext('2d');
+  const tctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
   const imgData = tctx.getImageData(0, 0, w, h).data;
   
   const lineSpacing = Math.max(4, Math.floor(16 - detail * 12));
