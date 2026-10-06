@@ -244,8 +244,8 @@ function startLivePreview() {
 async function processFrame() {
   const w = video.videoWidth || 640;
   const h = video.videoHeight || 480;
-  canvas.width = w;
-  canvas.height = h;
+  if (canvas.width !== w) canvas.width = w;
+  if (canvas.height !== h) canvas.height = h;
   ctx.drawImage(video, 0, 0, w, h);
 
   const segmentation = await net.segmentPerson(canvas, {internalResolution: 'medium', segmentationThreshold: 0.7});
@@ -781,10 +781,53 @@ function generateTopoLines(sourceCanvas, detail) {
   return paths;
 }
 
+// Styles that draw their own paths and don't need ImageTracer
+const CUSTOM_STYLE_GENERATORS = {
+  squiggle: generateSquiggleLines,
+  sobel: generateSobelLines,
+  topo: generateTopoLines,
+  spiral: generateSpiralLines,
+  constellation: generateConstellation,
+  blueprint: generateBlueprint,
+  invader: generateInvaders,
+  pinwheel: generatePinwheel,
+  wiggle: generateWiggles,
+  shards: generateShards,
+  composition: generateComposition
+};
+
+function makeSVGElement(w, h) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', w);
+  svg.setAttribute('height', h);
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  return svg;
+}
+
+function finalizeSVG(svg) {
+  const serializer = new XMLSerializer();
+  const finalSVG = serializer.serializeToString(svg);
+  preview.innerHTML = finalSVG;
+  preview.dataset.svg = finalSVG;
+}
+
 function generateSVGFromCanvasAsync(sourceCanvas, style, detail) {
   return new Promise((resolve) => {
+    const w = sourceCanvas.width;
+    const h = sourceCanvas.height;
+
+    // Custom styles generate their own paths — skip the PNG encode + trace entirely
+    const generator = CUSTOM_STYLE_GENERATORS[style];
+    if (generator) {
+      const svg = makeSVGElement(w, h);
+      generator(sourceCanvas, detail).forEach(p => svg.appendChild(p));
+      finalizeSVG(svg);
+      resolve();
+      return;
+    }
+
+    // Outline and Pixel use ImageTracer
     const dataURL = sourceCanvas.toDataURL('image/png');
-    
     const options = {
       ltres: Math.max(1, 1 + (1-detail)*5),
       qtres: Math.max(1, 1 + (1-detail)*5),
@@ -800,85 +843,17 @@ function generateSVGFromCanvasAsync(sourceCanvas, style, detail) {
       let svg = doc.querySelector('svg');
       if (!svg) { resolve(); return; }
 
-      svg.setAttribute('width', sourceCanvas.width);
-      svg.setAttribute('height', sourceCanvas.height);
-      svg.setAttribute('viewBox', `0 0 ${sourceCanvas.width} ${sourceCanvas.height}`);
+      svg.setAttribute('width', w);
+      svg.setAttribute('height', h);
+      svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
 
-      const paths = svg.querySelectorAll('path');
-      
-      // Handle Custom Remix Styles
-      if (style === 'squiggle') {
-        paths.forEach(p => p.remove());
-        const squigglePaths = generateSquiggleLines(sourceCanvas, detail);
-        squigglePaths.forEach(pathEl => svg.appendChild(pathEl));
-      }
-      else if (style === 'sobel') {
-        paths.forEach(p => p.remove());
-        const hatchPaths = generateSobelLines(sourceCanvas, detail);
-        hatchPaths.forEach(pathEl => svg.appendChild(pathEl));
-      } 
-      else if (style === 'topo') {
-        paths.forEach(p => p.remove());
-        const topoPaths = generateTopoLines(sourceCanvas, detail);
-        topoPaths.forEach(pathEl => svg.appendChild(pathEl));
-      }
-      else if (style === 'spiral') {
-        paths.forEach(p => p.remove());
-        const spiralPaths = generateSpiralLines(sourceCanvas, detail);
-        spiralPaths.forEach(pathEl => svg.appendChild(pathEl));
-      }
-      else if (style === 'constellation') {
-        paths.forEach(p => p.remove());
-        const dotPaths = generateConstellation(sourceCanvas, detail);
-        dotPaths.forEach(pathEl => svg.appendChild(pathEl));
-      }
-      else if (style === 'blueprint') {
-        paths.forEach(p => p.remove());
-        const blueprintPaths = generateBlueprint(sourceCanvas, detail);
-        blueprintPaths.forEach(pathEl => svg.appendChild(pathEl));
-      }
-      else if (style === 'invader') {
-        paths.forEach(p => p.remove());
-        const invaderPaths = generateInvaders(sourceCanvas, detail);
-        invaderPaths.forEach(pathEl => svg.appendChild(pathEl));
-      }
-      else if (style === 'pinwheel') {
-        paths.forEach(p => p.remove());
-        const pinwheelPaths = generatePinwheel(sourceCanvas, detail);
-        pinwheelPaths.forEach(pathEl => svg.appendChild(pathEl));
-      }
-      else if (style === 'scribble') {
-        paths.forEach(p => p.remove());
-        const scribblePaths = generateScribbles(sourceCanvas, detail);
-        scribblePaths.forEach(pathEl => svg.appendChild(pathEl));
-      }
-      else if (style === 'wiggle') {
-        paths.forEach(p => p.remove());
-        const wigglePaths = generateWiggles(sourceCanvas, detail);
-        wigglePaths.forEach(pathEl => svg.appendChild(pathEl));
-      }
-      else if (style === 'shards') {
-        paths.forEach(p => p.remove());
-        const shardPaths = generateShards(sourceCanvas, detail);
-        shardPaths.forEach(pathEl => svg.appendChild(pathEl));
-      }
-      else if (style === 'composition') {
-        paths.forEach(p => p.remove());
-        const compPaths = generateComposition(sourceCanvas, detail);
-        compPaths.forEach(pathEl => svg.appendChild(pathEl));
-      } else {
-        // Standard Outline or Pixel logic
-        paths.forEach(p => {
-          p.setAttribute('fill', 'none');
-          p.setAttribute('stroke', '#000');
-          p.setAttribute('stroke-width', '1');
-        });
-      }
+      svg.querySelectorAll('path').forEach(p => {
+        p.setAttribute('fill', 'none');
+        p.setAttribute('stroke', '#000');
+        p.setAttribute('stroke-width', '1');
+      });
 
-      const serializer = new XMLSerializer();
-      const finalSVG = serializer.serializeToString(svg);
-      preview.innerHTML = finalSVG;
-      preview.dataset.svg = finalSVG;
+      finalizeSVG(svg);
       resolve();
     }, options);
   });
