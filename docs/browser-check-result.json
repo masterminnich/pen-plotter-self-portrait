@@ -1,0 +1,68 @@
+{
+ "closed_panel_hidden": true,
+ "closed_body_class": "",
+ "closed_errors": [],
+ "open_estimate": "15 min 04 s",
+ "open_opt_summary": "Optimizing: pen lifts 2548 \u2192 831, travel 14.90 m \u2192 4.09 m (30 ms)",
+ "open_layout_info": "Lay the paper sideways on the machine: its corner at home, the top of the picture toward the home (left) side. Drawing size 190 \u00d7 238 mm.",
+ "squiggle_estimates_ms": {
+  "0.1": 121500,
+  "0.5": 193697,
+  "0.9": 469559
+ },
+ "travel_lines": 121,
+ "speed_change_ms": [
+  469559,
+  418803
+ ],
+ "plot_ready_svg_bytes": 127042,
+ "gcode_lines": 8558,
+ "serial_supported": true,
+ "closed_again_overlay": 0,
+ "open_errors": [],
+ "mock_conn_status": "Connected \u00b7 firmware 3.0.3",
+ "mock_pen_up_while_paused": true,
+ "mock_progress_text": "Finished \u00b7 2:35",
+ "mock_log_len": 1,
+ "mock_last_log": {
+  "style": "squiggle",
+  "est": 152779,
+  "actual": 154912.00000000215,
+  "lifts": 48
+ },
+ "mock_trace_strokes": 49,
+ "mock_expected_strokes": 48,
+ "mock_errors": [],
+ "mock_crashes": 0,
+ "mock_final_pos": [
+  -6.144668107666007e-13,
+  -3.9448999622493375e-13
+ ],
+ "mock_max_endpoint_err_mm": 0.005859375000085265,
+ "calibration_text": "Correction \u00d71.000 \u2192 \u00d71.014 (last plot took 2:35).",
+ "csv_head": [
+  "when,kind,style,detail,machine,paper,lifts,drawMm,travelMm,est_draw_s,est_travel_s,est_pen_s,est_overhead_s,est_raw_s,est_shown_s,actual_s,error_pct,drawSpeed,travelSpeed,drawAccel,travelAccel,cornering,penUpExtraMs,penDownExtraMs,cmdOverheadMs,kDraw,kTravel,kPen,correction,optimized,notes",
+  "2026-10-06 03:13:54,plot,squiggle,0.3,nextdraw-8511,letter portrait,48,4398.5,650.4,137.98,10.38,4.42,0.00,152.78,152.78,154.91,-1.4,35,100,800,1200,0.05,0,0,0,1,1,1,1,true,simulated"
+ ],
+ "square_bbox": [
+  20,
+  20,
+  70,
+  70
+ ],
+ "dry_pen_down": false,
+ "after_cancel_pos": [
+  -6.679101716144942e-13,
+  -3.552713678800501e-13,
+  true
+ ],
+ "after_cancel_text": "Cancelled \u2014 pen up, back home \u00b7 0:44",
+ "home_note_after_motors_off": "Before the first plot, the app will ask you to push the carriage to the home corner (motors off lets you move it by hand).",
+ "mock_page_errors": [],
+ "live_tags_seen": [
+  "live \u00b7 unoptimized",
+  "optimized"
+ ],
+ "after_freeze_tag": "optimized",
+ "live_errors": []
+}
