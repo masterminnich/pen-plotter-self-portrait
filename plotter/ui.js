@@ -343,11 +343,11 @@
     clearTimeout(settleTimer);
     if (!svg) { lastPrep = null; renderEstimate(null, ''); return; }
     if (st.live) {
-      // Live camera: quick unoptimized estimate at most ~3×/s; optimize once frames stop changing
+      // Live camera: quick unoptimized estimate at most ~3×/s. The full optimize runs on Freeze
+      // (camera noise changes nearly every frame, so waiting for the picture to hold still rarely works).
       const t = performance.now();
       if (t - lastLiveAt > 300) { lastLiveAt = t; recompute({ settle: false }); }
       else { clearTimeout(liveTimer); liveTimer = setTimeout(() => { lastLiveAt = performance.now(); recompute({ settle: false }); }, 300); }
-      settleTimer = setTimeout(() => recompute({ settle: true }), 900);
     } else {
       renderTag('computing…', '');
       settleTimer = setTimeout(() => recompute({ settle: true }), 250);
@@ -356,7 +356,9 @@
 
   function recompute(o) {
     if (!open || !lastSvg) return;
-    const optimize = o.settle && settings.optimize.enabled;
+    // A quick pass that lands after Freeze (a trailing live timer) is upgraded to the full one
+    const settle = o.settle || !appState().live;
+    const optimize = settle && settings.optimize.enabled;
     let prep;
     try {
       prep = L.preparePlot(lastSvg, settings, { optimize });
@@ -366,8 +368,8 @@
       return;
     }
     lastPrep = prep;
-    if (o.settle) lastOptimizedPrep = prep;
-    renderEstimate(prep, o.settle ? (optimize ? 'optimized' : 'not optimized') : 'live · unoptimized');
+    if (settle) lastOptimizedPrep = prep;
+    renderEstimate(prep, settle ? (optimize ? 'optimized' : 'not optimized') : 'live · unoptimized');
     drawPaperBorder();
     drawTravelOverlay();
   }
@@ -804,6 +806,14 @@
       $('pl-serial-warn').textContent = L.WebSerialManager.unsupportedMessage() + ' Estimates and downloads still work here.';
     }
     toggle.addEventListener('click', () => setOpen(!open));
+    // Freeze: run the full optimizer on the frozen frame right away
+    const freezeBtn = document.getElementById('take-photo');
+    // (deferred a tick: app.js registers its own Freeze handler later, so isFrozen isn't set yet)
+    if (freezeBtn) freezeBtn.addEventListener('click', () => setTimeout(() => {
+      if (!open || appState().live) return;
+      clearTimeout(liveTimer); clearTimeout(settleTimer);
+      recompute({ settle: true });
+    }, 0));
     $('pl-close').addEventListener('click', () => setOpen(false));
     $('pl-show-travel').addEventListener('change', (e) => { settings.optimize.showTravel = e.target.checked; saveSettings(); drawTravelOverlay(); });
     $('pl-show-paper').addEventListener('change', (e) => { settings.optimize.showPaper = e.target.checked; saveSettings(); drawPaperBorder(); });
