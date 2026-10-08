@@ -88,6 +88,7 @@
       simplifyTol: 0.02,     // mm, 0 = off
       curveTol: 0.05,        // mm, curve/arc flattening tolerance
       showTravel: false,
+      showPaper: false,      // outline the sheet (and margin) around the output preview
     },
     gcode: {
       penUpCmd: 'G0 Z5',

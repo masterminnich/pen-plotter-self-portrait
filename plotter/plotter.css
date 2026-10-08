@@ -254,6 +254,11 @@ body.plotter-open main {
   vector-effect: non-scaling-stroke;
 }
 
+/* paper border overlay inside the output preview */
+#preview svg .pl-paper rect { fill: none; vector-effect: non-scaling-stroke; }
+#preview svg .pl-paper .pl-paper-sheet { stroke: #8a8a8a; stroke-width: 1.2; }
+#preview svg .pl-paper .pl-paper-margin { stroke: #b8c4d0; stroke-width: 0.8; stroke-dasharray: 4 3; }
+
 @media (max-width: 768px) {
   body.plotter-open main { margin-right: 0; }
   #plotter-panel { width: 100%; }

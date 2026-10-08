@@ -96,6 +96,7 @@
         </table>
         <div class="pl-note" id="pl-opt-summary"></div>
         <label class="pl-note"><input type="checkbox" id="pl-show-travel"> Show travel moves on the preview</label>
+        <label class="pl-note"><input type="checkbox" id="pl-show-paper"> Show paper border on the preview</label>
       </div>
       <div class="pl-info" id="pl-layout-info"></div>
       <div class="pl-warn" id="pl-warn"></div>
@@ -294,6 +295,7 @@
     $('pl-pen-up-v').textContent = settings.machine.penUpPct + '%';
     $('pl-pen-down-v').textContent = settings.machine.penDownPct + '%';
     $('pl-show-travel').checked = !!settings.optimize.showTravel;
+    $('pl-show-paper').checked = !!settings.optimize.showPaper;
   }
 
   function onSettingChanged(sec, key) {
@@ -319,6 +321,7 @@
   function onSvgMaybeChanged() {
     if (!open) return;
     const svg = (document.getElementById('preview') || {}).dataset ? document.getElementById('preview').dataset.svg || '' : '';
+    drawPaperBorder(); // the sheet doesn't depend on the drawing, so keep it steady between live frames
     if (svg === lastSvg) { drawTravelOverlay(); return; }
     lastSvg = svg;
     lastOptimizedPrep = null;
@@ -351,6 +354,7 @@
     lastPrep = prep;
     if (o.settle) lastOptimizedPrep = prep;
     renderEstimate(prep, o.settle ? (optimize ? 'optimized' : 'not optimized') : 'live · unoptimized');
+    drawPaperBorder();
     drawTravelOverlay();
   }
 
@@ -422,6 +426,49 @@
     }
     g.appendChild(frag);
     svgEl.appendChild(g);
+  }
+
+  // ---------- paper border overlay ----------
+  // Outlines the sheet and its margin (from the machine/paper settings) around the drawing.
+  // Widens the preview's viewBox to fit; the downloaded SVG is untouched (it comes from dataset.svg).
+  function drawPaperBorder() {
+    const svgEl = document.querySelector('#preview svg');
+    if (!svgEl) return;
+    const old = svgEl.querySelector('g.pl-paper');
+    if (old) old.remove();
+    if (svgEl.dataset.plViewBox) {
+      svgEl.setAttribute('viewBox', svgEl.dataset.plViewBox);
+      svgEl.setAttribute('width', svgEl.dataset.plWidth);
+      svgEl.setAttribute('height', svgEl.dataset.plHeight);
+      delete svgEl.dataset.plViewBox; delete svgEl.dataset.plWidth; delete svgEl.dataset.plHeight;
+    }
+    const lay = lastPrep && lastPrep.layout;
+    if (!open || !settings.optimize.showPaper || !lay) return;
+    const s = lay.scale, vb = lay.viewBox, du = lay.drawRect.u0, dv = lay.drawRect.v0;
+    const toSrc = (u, v) => [vb[0] + (u - du) / s, vb[1] + (v - dv) / s];
+    const [x0, y0] = toSrc(0, 0), [x1, y1] = toSrc(lay.paperW, lay.paperH);
+    const [mx0, my0] = toSrc(lay.margin, lay.margin), [mx1, my1] = toSrc(lay.paperW - lay.margin, lay.paperH - lay.margin);
+    const pad = Math.max(x1 - x0, y1 - y0) * 0.01;
+    svgEl.dataset.plViewBox = svgEl.getAttribute('viewBox') || '';
+    svgEl.dataset.plWidth = svgEl.getAttribute('width') || '';
+    svgEl.dataset.plHeight = svgEl.getAttribute('height') || '';
+    const w = x1 - x0 + 2 * pad, h = y1 - y0 + 2 * pad;
+    svgEl.setAttribute('viewBox', `${(x0 - pad).toFixed(1)} ${(y0 - pad).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`);
+    svgEl.setAttribute('width', w.toFixed(1));
+    svgEl.setAttribute('height', h.toFixed(1));
+    const NS = 'http://www.w3.org/2000/svg';
+    const g = document.createElementNS(NS, 'g');
+    g.setAttribute('class', 'pl-paper');
+    const rect = (cls, a, b, c, d) => {
+      const r = document.createElementNS(NS, 'rect');
+      r.setAttribute('class', cls);
+      r.setAttribute('x', a.toFixed(1)); r.setAttribute('y', b.toFixed(1));
+      r.setAttribute('width', Math.max(0, c - a).toFixed(1)); r.setAttribute('height', Math.max(0, d - b).toFixed(1));
+      g.appendChild(r);
+    };
+    rect('pl-paper-sheet', x0, y0, x1, y1);
+    if (lay.margin > 0) rect('pl-paper-margin', mx0, my0, mx1, my1);
+    svgEl.insertBefore(g, svgEl.firstChild);
   }
 
   // ---------- downloads ----------
@@ -729,6 +776,7 @@
       clearTimeout(liveTimer); clearTimeout(settleTimer);
       const g = document.querySelector('#preview svg g.pl-travel');
       if (g) g.remove();
+      drawPaperBorder();
     }
   }
 
@@ -744,6 +792,7 @@
     toggle.addEventListener('click', () => setOpen(!open));
     $('pl-close').addEventListener('click', () => setOpen(false));
     $('pl-show-travel').addEventListener('change', (e) => { settings.optimize.showTravel = e.target.checked; saveSettings(); drawTravelOverlay(); });
+    $('pl-show-paper').addEventListener('change', (e) => { settings.optimize.showPaper = e.target.checked; saveSettings(); drawPaperBorder(); });
     $('pl-dl-svg').addEventListener('click', () => {
       const prep = currentOptimizedPrep(); if (!prep) return;
       download('penplot-plot-ready.svg', L.plotReadySvg(prep.paperPaths, prep.layout, metaLine()), 'image/svg+xml');
