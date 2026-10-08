@@ -12,7 +12,7 @@ const gcode = require('../plotter/gcode.js');
 
 const DIR = path.join(__dirname, 'fixtures', 'svg');
 const STYLES = ['outline', 'blueprint', 'topo', 'constellation', 'pinwheel', 'pixel', 'squiggle',
-  'invader', 'sobel', 'spiral', 'wiggle', 'shards', 'composition'];
+  'invader', 'sobel', 'wiggle', 'shards', 'composition'];
 const read = (name) => fs.readFileSync(path.join(DIR, name), 'utf8');
 
 for (const style of STYLES) {

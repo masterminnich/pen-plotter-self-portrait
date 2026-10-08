@@ -16,7 +16,7 @@ IMG = next((ROOT / "test" / "fixtures").glob("portrait-*.jpg"))
 OUT = ROOT / "test" / "fixtures" / "svg"
 OUT.mkdir(parents=True, exist_ok=True)
 STYLES = ["outline", "blueprint", "topo", "constellation", "pinwheel", "pixel", "squiggle",
-          "invader", "sobel", "spiral", "wiggle", "shards", "composition"]
+          "invader", "sobel", "wiggle", "shards", "composition"]
 RUNS = [(s, 0.5) for s in STYLES] + [("squiggle", 0.1), ("squiggle", 0.9), ("outline", 0.1), ("outline", 0.9)]
 
 with sync_playwright() as p:

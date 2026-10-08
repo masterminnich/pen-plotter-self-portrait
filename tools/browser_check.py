@@ -18,7 +18,7 @@ IMG = str(next((ROOT / "test" / "fixtures").glob("portrait-*.jpg")))
 SHOTS = ROOT / "docs" / "screenshots"
 SHOTS.mkdir(parents=True, exist_ok=True)
 STYLES = ["outline", "blueprint", "topo", "constellation", "pinwheel", "pixel", "squiggle",
-          "invader", "sobel", "spiral", "wiggle", "shards", "composition"]
+          "invader", "sobel", "wiggle", "shards", "composition"]
 results = {}
 
 

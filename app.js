@@ -786,7 +786,6 @@ const CUSTOM_STYLE_GENERATORS = {
   squiggle: generateSquiggleLines,
   sobel: generateSobelLines,
   topo: generateTopoLines,
-  spiral: generateSpiralLines,
   constellation: generateConstellation,
   blueprint: generateBlueprint,
   invader: generateInvaders,
@@ -860,57 +859,6 @@ function generateSVGFromCanvasAsync(sourceCanvas, style, detail) {
 }
 
 // --- STYLE GENERATORS ---
-
-function generateSpiralLines(sourceCanvas, detail) {
-  const w = sourceCanvas.width;
-  const h = sourceCanvas.height;
-  const tctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
-  const imgData = tctx.getImageData(0, 0, w, h).data;
-  
-  const centerX = w / 2;
-  const centerY = h / 2;
-  const maxRadius = Math.sqrt(w*w + h*h) / 2;
-  
-  // Controls how tight the spiral is
-  const spacing = Math.max(2, Math.floor(10 - detail * 7));
-  let pathD = "";
-  let inSeg = false;
-
-  // We loop through the radius and the angle
-  for (let r = 2; r < maxRadius; r += spacing / 10) {
-    // The angle moves as the radius increases
-    const angle = r * (spacing * 0.5);
-    const x = centerX + Math.cos(angle) * r;
-    const y = centerY + Math.sin(angle) * r;
-
-    if (x >= 0 && x < w && y >= 0 && y < h) {
-      const idx = (Math.floor(y) * w + Math.floor(x)) * 4;
-      const alpha = imgData[idx + 3];
-      
-      if (alpha > 128) {
-        const brightness = (imgData[idx] + imgData[idx+1] + imgData[idx+2]) / 3;
-        const darkness = 1 - (brightness / 255);
-        
-        // The "Spirograph" wobble: 
-        // Darker pixels = bigger amplitude waves along the spiral
-        const wobble = Math.sin(r * 2) * (darkness * spacing * 1.5);
-        const finalX = centerX + Math.cos(angle) * (r + wobble);
-        const finalY = centerY + Math.sin(angle) * (r + wobble);
-
-        if (!inSeg) {
-          pathD += `M ${finalX.toFixed(1)} ${finalY.toFixed(1)} `;
-          inSeg = true;
-        } else {
-          pathD += `L ${finalX.toFixed(1)} ${finalY.toFixed(1)} `;
-        }
-      } else {
-        inSeg = false;
-      }
-    }
-  }
-
-  return [createPathElement(pathD)];
-}
 
 function generateSobelLines(sourceCanvas, detail) {
   const w = sourceCanvas.width;
