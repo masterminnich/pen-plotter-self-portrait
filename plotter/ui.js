@@ -235,6 +235,48 @@
     ]],
   ];
 
+  // Circled "i" (inline SVG, no icon library needed)
+  const INFO_ICON = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="4.7" r="1" fill="currentColor"/><path d="M8 7.2v4.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  const HAS_POPOVER = typeof HTMLElement !== 'undefined' && HTMLElement.prototype.hasOwnProperty('popover');
+
+  // Click/tap the "i" to show a setting's notes as bullet points in a popover next to it.
+  // Uses the browser's built-in Popover API (closes on outside click / Esc) so the form never shifts.
+  function addHintPopover(btn, hints, popId, parent) {
+    const pop = document.createElement('ul');
+    pop.className = 'pl-hint';
+    pop.id = popId;
+    pop.innerHTML = hints.map(h => `<li>${esc(h)}</li>`).join('');
+    btn.setAttribute('aria-controls', popId);
+    if (!HAS_POPOVER) { // very old browsers: fall back to showing the notes inline
+      pop.classList.add('pl-hint-inline');
+      pop.hidden = true;
+      parent.appendChild(pop);
+      btn.addEventListener('click', (e) => { e.preventDefault(); pop.hidden = !pop.hidden; btn.setAttribute('aria-expanded', String(!pop.hidden)); });
+      return;
+    }
+    pop.popover = 'auto';
+    parent.appendChild(pop);
+    const place = () => {
+      const r = btn.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight, gap = 6;
+      const left = Math.max(8, Math.min(r.left + r.width / 2 - pw / 2, window.innerWidth - pw - 8));
+      const below = r.bottom + gap + ph <= window.innerHeight - 8;
+      pop.style.left = left + 'px';
+      pop.style.top = (below ? r.bottom + gap : Math.max(8, r.top - gap - ph)) + 'px';
+    };
+    pop.addEventListener('toggle', (e) => {
+      btn.setAttribute('aria-expanded', String(e.newState === 'open'));
+    });
+    // pointerdown + preventDefault on click: the button sits inside a <label>, so stop it toggling the input,
+    // and don't let light-dismiss close the popover just before the click reopens it
+    let wasOpen = false;
+    btn.addEventListener('pointerdown', () => { wasOpen = pop.matches(':popover-open'); });
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (wasOpen || pop.matches(':popover-open')) pop.hidePopover(); else { pop.showPopover(); place(); }
+      wasOpen = false;
+    });
+  }
+
   function buildSettingsForm() {
     const body = $('pl-settings-body');
     body.innerHTML = '';
@@ -260,23 +302,10 @@
         } else {
           input = `<span><input type="number" id="${id}" ${opts.step ? `step="${opts.step}"` : ''} ${opts.min !== undefined ? `min="${opts.min}"` : ''} ${opts.max !== undefined ? `max="${opts.max}"` : ''}></span>`;
         }
-        const info = opts.hint ? ` <button type="button" class="pl-info-btn" aria-label="More about this setting" aria-expanded="false">i</button>` : '';
+        const info = opts.hint ? ` <button type="button" class="pl-info-btn" aria-label="More about this setting" aria-expanded="false">${INFO_ICON}</button>` : '';
         row.innerHTML = `<span>${esc(label)}${opts.unit ? ` <span class="pl-unit">(${esc(opts.unit)})</span>` : ''}${info}</span>${input}`;
         det.appendChild(row);
-        if (opts.hint) {
-          // Tap/click the "i" to show the notes as bullet points right under the setting (no slow hover tooltip)
-          const ul = document.createElement('ul');
-          ul.className = 'pl-hint';
-          ul.hidden = true;
-          ul.innerHTML = [].concat(opts.hint).map(h => `<li>${esc(h)}</li>`).join('');
-          det.appendChild(ul);
-          const btn = row.querySelector('.pl-info-btn');
-          btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            ul.hidden = !ul.hidden;
-            btn.setAttribute('aria-expanded', String(!ul.hidden));
-          });
-        }
+        if (opts.hint) addHintPopover(row.querySelector('.pl-info-btn'), [].concat(opts.hint), id + '-hint', det);
         const el = row.querySelector('#' + id);
         const handler = () => {
           let v;
@@ -807,6 +836,7 @@
       $('pl-serial-warn').textContent = L.WebSerialManager.unsupportedMessage() + ' Estimates and downloads still work here.';
     }
     toggle.addEventListener('click', () => setOpen(!open));
+    panel.addEventListener('scroll', () => { panel.querySelectorAll('.pl-hint:popover-open').forEach(p => p.hidePopover()); }, { capture: true, passive: true });
     // Freeze: run the full optimizer on the frozen frame right away
     const freezeBtn = document.getElementById('take-photo');
     // (deferred a tick: app.js registers its own Freeze handler later, so isFrozen isn't set yet)

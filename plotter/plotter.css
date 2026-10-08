@@ -190,20 +190,23 @@ body.plotter-open main {
 .pl-field.pl-check { grid-template-columns: 1fr auto; }
 .pl-field textarea { grid-column: 1 / -1; width: 100%; min-height: 40px; }
 
-/* "i" button next to a setting; toggles its bullet-point notes */
-.pl-info-btn {
+/* circled "i" next to a setting; opens its bullet-point notes in a popover */
+#plotter-panel .pl-info-btn {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 16px; height: 16px; padding: 0; margin-left: 4px;
-  border: 1px solid #9aa7b4; border-radius: 50%; background: #fff;
-  color: #4a6378; font: italic 600 11px/1 Georgia, serif;
-  cursor: pointer; vertical-align: middle;
+  width: 18px; height: 18px; padding: 0; margin-left: 3px;
+  border: 0; border-radius: 50%; background: none;
+  color: #5b7488; cursor: pointer; vertical-align: -4px;
 }
-.pl-info-btn:hover, .pl-info-btn[aria-expanded="true"] { background: #e6eef5; border-color: #4a6378; }
+#plotter-panel .pl-info-btn:hover, #plotter-panel .pl-info-btn[aria-expanded="true"] { color: #1f4e79; background: #e6eef5; }
+#plotter-panel .pl-info-btn:focus-visible { outline: 2px solid #1f4e79; outline-offset: 1px; }
 .pl-hint {
-  margin: 0 0 6px; padding: 6px 8px 6px 22px;
-  background: #f3f6f9; border-radius: 4px;
-  font-size: 12px; color: #444;
+  margin: 0; padding: 7px 10px 7px 24px;
+  background: #fff; border: 1px solid #c9d3dc; border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  font-size: 12px; line-height: 1.4; color: #333;
 }
+.pl-hint[popover] { position: fixed; inset: auto; max-width: 280px; }
+.pl-hint.pl-hint-inline { margin: 0 0 6px; box-shadow: none; }
 .pl-hint li { margin: 2px 0; }
 
 .pl-slider {
