@@ -179,15 +179,15 @@
   const FORM = [
     ['Machine', [
       ['machine', 'profile', 'Machine', 'select', { options: MACHINE_OPTS }],
-      ['machine', 'travelX', 'Travel along long axis (X)', 'number', { unit: 'mm', step: 0.1 }],
-      ['machine', 'travelY', 'Travel along short axis (Y)', 'number', { unit: 'mm', step: 0.1 }],
+      ['machine', 'travelX', 'Travel along long axis (X)', 'number', { unit: 'mm', step: 0.1, hint: ['How far the pen can reach from home', 'Filled in when you pick a machine'] }],
+      ['machine', 'travelY', 'Travel along short axis (Y)', 'number', { unit: 'mm', step: 0.1, hint: ['How far the pen can reach from home', 'Filled in when you pick a machine'] }],
       ['machine', 'penlift', 'Pen-lift motor', 'select', { options: PENLIFT_OPTS }],
       ['machine', 'invertPen', 'Swap pen up/down (if Test Up lowers it)', 'check'],
-      ['machine', 'penRateRaise', 'Pen raising speed', 'number', { unit: '%', min: 1, max: 100 }],
+      ['machine', 'penRateRaise', 'Pen raising speed', 'number', { unit: '%', min: 1, max: 100, hint: 'NextDraw default is 75%' }],
       ['machine', 'penRateLower', 'Pen lowering speed', 'number', { unit: '%', min: 1, max: 100 }],
-      ['machine', 'stepsPerMm', 'Steps per mm', 'number', { step: 0.001, hint: 'Fix this if the 50 mm square measures wrong: new = old × 50 ÷ measured' }],
-      ['machine', 'maxStepRate', 'Max motor step rate', 'number', { unit: 'steps/s', step: 100 }],
-      ['machine', 'window', 'Commands in flight', 'number', { min: 1, max: 32, hint: 'Small = Pause and Cancel react faster' }],
+      ['machine', 'stepsPerMm', 'Steps per mm', 'number', { step: 0.001, hint: ['Fix this if the 50 mm test square measures wrong', 'New value = old × 50 ÷ measured size'] }],
+      ['machine', 'maxStepRate', 'Max motor step rate', 'number', { unit: 'steps/s', step: 100, hint: '25,000 is the controller board\'s hard limit' }],
+      ['machine', 'window', 'Commands in flight', 'number', { min: 1, max: 32, hint: ['How many moves are queued on the plotter at once', 'Small = Pause and Cancel react faster'] }],
       ['machine', 'homeRate', 'Walk-home speed', 'number', { unit: 'steps/s', step: 100, min: 100, max: 25000 }],
       ['machine', 'usbFilter', 'Only list NextDraw (EiBotBoard) USB devices', 'check', { hint: 'Untick if the plotter does not appear in Chrome\'s port list' }],
     ]],
@@ -196,40 +196,40 @@
       ['paper', 'orientation', 'Orientation (as you look at the picture)', 'select', { options: [['portrait', 'Portrait'], ['landscape', 'Landscape']] }],
       ['paper', 'customW', 'Custom width', 'number', { unit: 'mm', step: 0.1, show: () => settings.paper.size === 'custom' }],
       ['paper', 'customH', 'Custom height', 'number', { unit: 'mm', step: 0.1, show: () => settings.paper.size === 'custom' }],
-      ['paper', 'margin', 'Margin', 'number', { unit: 'mm', step: 0.1 }],
-      ['paper', 'rotate', 'Sheet on the machine', 'select', { options: [['auto', 'Automatic (sideways if needed)'], ['none', 'Same way up as the picture'], ['rotate', 'Always sideways']] }],
-      ['paper', 'offsetX', 'Paper corner offset from home, X', 'number', { unit: 'mm', step: 0.5 }],
-      ['paper', 'offsetY', 'Paper corner offset from home, Y', 'number', { unit: 'mm', step: 0.5 }],
+      ['paper', 'margin', 'Margin', 'number', { unit: 'mm', step: 0.1, hint: ['Blank space kept around every edge of the sheet', 'The drawing is scaled to fit inside it'] }],
+      ['paper', 'rotate', 'Sheet on the machine', 'select', { options: [['auto', 'Automatic (sideways if needed)'], ['none', 'Same way up as the picture'], ['rotate', 'Always sideways']], hint: ['Turns the sheet 90° on the machine when needed', 'Automatic only turns it if the picture won\'t fit the other way'] }],
+      ['paper', 'offsetX', 'Paper corner offset from home, X', 'number', { unit: 'mm', step: 0.5, hint: 'Use if the sheet\'s corner isn\'t exactly at the home position' }],
+      ['paper', 'offsetY', 'Paper corner offset from home, Y', 'number', { unit: 'mm', step: 0.5, hint: 'Use if the sheet\'s corner isn\'t exactly at the home position' }],
     ]],
     ['Timing (the estimate updates as you type)', [
-      ['timing', 'drawSpeed', 'Drawing speed (pen down)', 'number', { unit: 'mm/s', step: 1, min: 1 }],
-      ['timing', 'travelSpeed', 'Travel speed (pen up)', 'number', { unit: 'mm/s', step: 1, min: 1 }],
+      ['timing', 'drawSpeed', 'Drawing speed (pen down)', 'number', { unit: 'mm/s', step: 1, min: 1, hint: ['Starts on the cautious side', 'NextDraw\'s own default is about 55 mm/s'] }],
+      ['timing', 'travelSpeed', 'Travel speed (pen up)', 'number', { unit: 'mm/s', step: 1, min: 1, hint: ['Starts on the cautious side', 'NextDraw\'s own default is about 165 mm/s'] }],
       ['timing', 'drawAccel', 'Acceleration, pen down', 'number', { unit: 'mm/s²', step: 50, min: 10 }],
       ['timing', 'travelAccel', 'Acceleration, pen up', 'number', { unit: 'mm/s²', step: 50, min: 10 }],
       ['timing', 'cornering', 'Cornering (junction deviation)', 'number', { unit: 'mm', step: 0.01, min: 0.001, hint: 'Bigger = corners taken faster' }],
       ['timing', 'penUpExtraMs', 'Extra pen-up delay', 'number', { unit: 'ms', step: 5, min: 0 }],
       ['timing', 'penDownExtraMs', 'Extra pen-down delay', 'number', { unit: 'ms', step: 5, min: 0 }],
       ['timing', 'cmdOverheadMs', 'Per-command overhead', 'number', { unit: 'ms', step: 0.1, min: 0, hint: 'Only affects the estimate' }],
-      ['timing', 'maxSliceMs', 'Acceleration time slice', 'number', { unit: 'ms', step: 1, min: 3, max: 200 }],
-      ['timing', 'kDraw', 'Drawing time × (calibration)', 'number', { step: 0.01, min: 0.01 }],
-      ['timing', 'kTravel', 'Travel time × (calibration)', 'number', { step: 0.01, min: 0.01 }],
-      ['timing', 'kPen', 'Pen-lift time × (calibration)', 'number', { step: 0.01, min: 0.01 }],
-      ['timing', 'correction', 'Overall correction ×', 'number', { step: 0.01, min: 0.01 }],
+      ['timing', 'maxSliceMs', 'Acceleration time slice', 'number', { unit: 'ms', step: 1, min: 3, max: 200, hint: 'Speed-ups and slow-downs are sent in steps this long' }],
+      ['timing', 'kDraw', 'Drawing time × (calibration)', 'number', { step: 0.01, min: 0.01, hint: 'Set for you by “Fit each term” in the plot log' }],
+      ['timing', 'kTravel', 'Travel time × (calibration)', 'number', { step: 0.01, min: 0.01, hint: 'Set for you by “Fit each term” in the plot log' }],
+      ['timing', 'kPen', 'Pen-lift time × (calibration)', 'number', { step: 0.01, min: 0.01, hint: 'Set for you by “Fit each term” in the plot log' }],
+      ['timing', 'correction', 'Overall correction ×', 'number', { step: 0.01, min: 0.01, hint: 'Set for you by “Calibrate from last plot”' }],
     ]],
     ['Path optimization', [
-      ['optimize', 'enabled', 'Optimize paths', 'check'],
+      ['optimize', 'enabled', 'Optimize paths', 'check', { hint: 'Fewer pen lifts and less pen-up travel, so plots finish sooner' }],
       ['optimize', 'merge', 'Join paths that touch', 'check'],
       ['optimize', 'mergeTol', 'Join if ends are closer than', 'number', { unit: 'mm', step: 0.1, min: 0 }],
       ['optimize', 'sort', 'Reorder paths (nearest first)', 'check'],
       ['optimize', 'reverse', 'Allow drawing paths backwards', 'check'],
-      ['optimize', 'simplifyTol', 'Drop points closer to a straight line than', 'number', { unit: 'mm', step: 0.01, min: 0 }],
-      ['optimize', 'curveTol', 'Curve smoothness (max error)', 'number', { unit: 'mm', step: 0.01, min: 0.005 }],
+      ['optimize', 'simplifyTol', 'Drop points closer to a straight line than', 'number', { unit: 'mm', step: 0.01, min: 0, hint: '0 = off' }],
+      ['optimize', 'curveTol', 'Curve smoothness (max error)', 'number', { unit: 'mm', step: 0.01, min: 0.005, hint: 'Smaller = smoother curves, but more moves' }],
     ]],
     ['G-code (Grbl)', [
       ['gcode', 'penUpCmd', 'Pen up command', 'text'],
       ['gcode', 'penDownCmd', 'Pen down command', 'text'],
       ['gcode', 'penDwellMs', 'Pause after pen up/down', 'number', { unit: 'ms', step: 10, min: 0 }],
-      ['gcode', 'originBottomLeft', 'Origin at bottom-left, Y up', 'check'],
+      ['gcode', 'originBottomLeft', 'Origin at bottom-left, Y up', 'check', { hint: 'The usual CNC convention' }],
       ['gcode', 'header', 'Extra lines at the start', 'textarea'],
       ['gcode', 'footer', 'Extra lines at the end', 'textarea'],
     ]],
@@ -247,7 +247,6 @@
         const row = document.createElement('label');
         row.className = 'pl-field' + (type === 'check' ? ' pl-check' : '');
         row.dataset.key = sec + '.' + key;
-        if (opts.hint) row.title = opts.hint;
         const id = `pl-set-${sec}-${key}`;
         let input;
         if (type === 'select') {
@@ -261,8 +260,23 @@
         } else {
           input = `<span><input type="number" id="${id}" ${opts.step ? `step="${opts.step}"` : ''} ${opts.min !== undefined ? `min="${opts.min}"` : ''} ${opts.max !== undefined ? `max="${opts.max}"` : ''}></span>`;
         }
-        row.innerHTML = `<span>${esc(label)}${opts.unit ? ` <span class="pl-unit">(${esc(opts.unit)})</span>` : ''}</span>${input}`;
+        const info = opts.hint ? ` <button type="button" class="pl-info-btn" aria-label="More about this setting" aria-expanded="false">i</button>` : '';
+        row.innerHTML = `<span>${esc(label)}${opts.unit ? ` <span class="pl-unit">(${esc(opts.unit)})</span>` : ''}${info}</span>${input}`;
         det.appendChild(row);
+        if (opts.hint) {
+          // Tap/click the "i" to show the notes as bullet points right under the setting (no slow hover tooltip)
+          const ul = document.createElement('ul');
+          ul.className = 'pl-hint';
+          ul.hidden = true;
+          ul.innerHTML = [].concat(opts.hint).map(h => `<li>${esc(h)}</li>`).join('');
+          det.appendChild(ul);
+          const btn = row.querySelector('.pl-info-btn');
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            ul.hidden = !ul.hidden;
+            btn.setAttribute('aria-expanded', String(!ul.hidden));
+          });
+        }
         const el = row.querySelector('#' + id);
         const handler = () => {
           let v;

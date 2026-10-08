@@ -189,6 +189,22 @@ body.plotter-open main {
 .pl-field.pl-check { grid-template-columns: 1fr auto; }
 .pl-field textarea { grid-column: 1 / -1; width: 100%; min-height: 40px; }
 
+/* "i" button next to a setting; toggles its bullet-point notes */
+.pl-info-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; padding: 0; margin-left: 4px;
+  border: 1px solid #9aa7b4; border-radius: 50%; background: #fff;
+  color: #4a6378; font: italic 600 11px/1 Georgia, serif;
+  cursor: pointer; vertical-align: middle;
+}
+.pl-info-btn:hover, .pl-info-btn[aria-expanded="true"] { background: #e6eef5; border-color: #4a6378; }
+.pl-hint {
+  margin: 0 0 6px; padding: 6px 8px 6px 22px;
+  background: #f3f6f9; border-radius: 4px;
+  font-size: 12px; color: #444;
+}
+.pl-hint li { margin: 2px 0; }
+
 .pl-slider {
   display: grid;
   grid-template-columns: 90px 1fr 42px;
