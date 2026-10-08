@@ -9,7 +9,6 @@
   const S = L;
   const LS_SETTINGS = 'penplot.plotter.settings.v1';
   const LS_LOG = 'penplot.plotter.log.v1';
-  const LS_OPEN = 'penplot.plotter.open';
   const params = new URLSearchParams(location.search);
   const MOCK = params.get('mockplotter') === '1';
 
@@ -725,7 +724,6 @@
     panel.hidden = !v;
     document.body.classList.toggle('plotter-open', v);
     $('plotter-toggle').setAttribute('aria-expanded', String(v));
-    try { localStorage.setItem(LS_OPEN, v ? '1' : '0'); } catch (e) {}
     if (v) { lastSvg = null; onSvgMaybeChanged(); updateButtons(); }
     else {
       clearTimeout(liveTimer); clearTimeout(settleTimer);
@@ -792,9 +790,8 @@
     const preview = document.getElementById('preview');
     if (preview) new MutationObserver(() => { if (open) onSvgMaybeChanged(); }).observe(preview, { childList: true });
     updateButtons();
-    let wasOpen = false;
-    try { wasOpen = localStorage.getItem(LS_OPEN) === '1'; } catch (e) {}
-    if (wasOpen || params.get('plotter') === '1' || MOCK) setOpen(true);
+    // Always start closed; ?plotter=1 (or the mock) opens it for testing.
+    if (params.get('plotter') === '1' || MOCK) setOpen(true);
     window.PlotterUI = { get settings() { return settings; }, get log() { return log; }, get lastPrep() { return lastPrep; }, get manager() { return mgr; }, get mock() { return mockDev; }, setOpen, recompute };
   }
 
