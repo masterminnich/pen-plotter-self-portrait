@@ -364,7 +364,8 @@
       prep = L.preparePlot(lastSvg, settings, { optimize });
     } catch (e) {
       console.error(e);
-      $('pl-warn').textContent = 'Could not read the drawing: ' + e.message;
+      renderTag('error', 'pl-error');
+      $('pl-warn').textContent = (optimize ? 'The optimizer hit an error: ' : 'Could not read the drawing: ') + e.message;
       return;
     }
     lastPrep = prep;
