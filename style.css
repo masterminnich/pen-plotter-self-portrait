@@ -140,6 +140,7 @@ label {
   align-items: center;
   justify-content: center;
   min-height: 0;
+  position: relative;
 }
 
 video {
@@ -169,6 +170,146 @@ video {
   height: auto;
   object-fit: contain;
 }
+
+/* ---------- Mask brush (mask-editor.js) ---------- */
+.video-container [hidden] { display: none !important; }
+
+.mask-edit-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: rgba(20, 20, 22, 0.78);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.mask-edit-btn:hover { background: rgba(20, 20, 22, 0.92); }
+.mask-edit-btn.mask-edited::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #14b8a6;
+}
+
+.mask-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  cursor: none;
+  touch-action: none;
+}
+
+.mask-cursor {
+  position: absolute;
+  z-index: 4;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mask-cursor::after {
+  font: 600 14px/1 system-ui, sans-serif;
+  color: #fff;
+  text-shadow: 0 0 3px #000;
+}
+.mask-cursor-add { border-color: #2dd4bf; background: rgba(45, 212, 191, 0.14); }
+.mask-cursor-add::after { content: '+'; }
+.mask-cursor-erase { border-color: #f97316; background: rgba(249, 115, 22, 0.14); border-style: dashed; }
+.mask-cursor-erase::after { content: '−'; }
+
+.mask-tip {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  width: fit-content;
+  max-width: calc(100% - 20px);
+  margin: 0 auto;
+  z-index: 3;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(20, 20, 22, 0.78);
+  color: #e5e5e5;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  transition: opacity 0.6s ease 1.5s;
+}
+.mask-tip.mask-tip-faded { opacity: 0; }
+.mask-tip kbd {
+  font: inherit;
+  padding: 0 4px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 3px;
+}
+
+.mask-toolbar {
+  position: absolute;
+  bottom: 12px;
+  left: 8px;
+  right: 8px;
+  width: fit-content;
+  margin: 0 auto;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(20, 20, 22, 0.88);
+  color: #fff;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+.mask-toolbar button {
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+.mask-toolbar button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); }
+.mask-toolbar button:disabled { opacity: 0.4; cursor: default; }
+.mask-toolbar button b { font-size: 15px; margin-right: 2px; }
+
+.mask-seg { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.18); }
+.mask-seg button { border: none; border-radius: 0; }
+.mask-seg button + button { border-left: 1px solid rgba(255, 255, 255, 0.18); }
+.mask-seg [data-mode="add"][aria-pressed="true"] { background: #0f766e; }
+.mask-seg [data-mode="erase"][aria-pressed="true"] { background: #c2410c; }
+
+.mask-size { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #fff; }
+.mask-size input { width: 110px; accent-color: #2dd4bf; }
+.mask-dot { display: inline-block; border-radius: 50%; background: #fff; }
+.mask-dot-sm { width: 5px; height: 5px; }
+.mask-dot-lg { width: 13px; height: 13px; }
+
+.mask-toolbar .mask-done { background: #fff; color: #111; border-color: #fff; font-weight: 600; }
+.mask-toolbar .mask-done:hover { background: #e5e5e5; }
 
 /* Stack vertically on smaller screens */
 @media (max-width: 768px) {

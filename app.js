@@ -12,6 +12,13 @@ let net = null;
 let isFrozen = false;
 let livePreviewId = null;
 
+// The still being shown: raw pixels, the AI person mask, and any hand edits (mask-editor.js)
+let lastFrame = null;   // ImageData
+let lastMask = null;    // 1 = person, per pixel
+let editedMask = null;  // replaces lastMask once the brush has been used
+let stillRendering = false;
+let stillPending = false;
+
 // Mode and upload
 let currentMode = 'camera'; // 'camera' or 'upload'
 let uploadedImage = null;
@@ -52,17 +59,9 @@ async function init() {
   uploadBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', handleFileUpload);
   
-  // Live update on style/detail change in upload mode
-  styleSelect.addEventListener('change', () => {
-    if (currentMode === 'upload' && uploadedImage && !isFrozen) {
-      processUploadedImage();
-    }
-  });
-  detailRange.addEventListener('input', () => {
-    if (currentMode === 'upload' && uploadedImage && !isFrozen) {
-      processUploadedImage();
-    }
-  });
+  // Style/detail changes redraw a still (upload or frozen frame) from its kept mask
+  styleSelect.addEventListener('change', redrawStillOnChange);
+  detailRange.addEventListener('input', redrawStillOnChange);
 
   // Load BodyPix model in background
   net = await bodyPix.load({architecture: 'MobileNetV1', outputStride: 16, multiplier: 0.75, quantBytes: 2});
@@ -122,6 +121,39 @@ function switchMode(mode) {
   // Clear preview
   preview.innerHTML = '';
   preview.dataset.svg = '';
+  lastFrame = null;
+  lastMask = null;
+  editedMask = null;
+  updateMaskEditAvailability();
+}
+
+function redrawStillOnChange() {
+  if (currentMode === 'upload' && uploadedImage) {
+    if (lastFrame) rerenderStill(); else processUploadedImage();
+  } else if (currentMode === 'camera' && isFrozen && lastFrame) {
+    rerenderStill();
+  }
+}
+
+// Redraw the current still with the edited (or AI) mask; one render at a time, the newest wins
+async function rerenderStill() {
+  if (!lastFrame) return;
+  if (stillRendering) { stillPending = true; return; }
+  stillRendering = true;
+  try {
+    do {
+      stillPending = false;
+      await renderMasked(lastFrame, editedMask || lastMask);
+    } while (stillPending);
+  } finally {
+    stillRendering = false;
+  }
+}
+
+function updateMaskEditAvailability() {
+  if (!window.MaskEditor) return;
+  const still = currentMode === 'upload' ? !!uploadedImage : isFrozen;
+  window.MaskEditor.setAvailable(!!lastFrame && still);
 }
 
 function handleFileUpload(e) {
@@ -139,7 +171,11 @@ function handleFileUpload(e) {
       isFrozen = false;
       takeBtn.textContent = 'Freeze';
       downloadBtn.disabled = true;
-      
+      lastFrame = null;
+      lastMask = null;
+      editedMask = null;
+      updateMaskEditAvailability();
+
       // Auto-process the image
       processUploadedImage();
     };
@@ -172,47 +208,16 @@ async function processUploadedImage() {
   
   // Run segmentation
   const segmentation = await net.segmentPerson(canvas, {internalResolution: 'medium', segmentationThreshold: 0.7});
-  
-  const imgData = ctx.getImageData(0, 0, w, h);
-  const data = imgData.data;
-  for (let i = 0; i < w * h; i++) {
-    if (!segmentation.data[i]) {
-      data[i * 4 + 3] = 0;
-    }
-  }
-  
-  const outCanvas = document.createElement('canvas');
-  outCanvas.width = w;
-  outCanvas.height = h;
-  const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
-  outCtx.putImageData(imgData, 0, 0);
-  
-  const style = styleSelect.value;
-  const detail = parseFloat(detailRange.value);
-  
-  if (style === 'pixel') {
-    const px = Math.max(24, Math.floor(64 + detail * 256));
-    const tiny = document.createElement('canvas');
-    tiny.width = px;
-    tiny.height = Math.round(px * h / w);
-    const tctx = tiny.getContext('2d', { willReadFrequently: true });
-    tctx.imageSmoothingEnabled = false;
-    tctx.drawImage(outCanvas, 0, 0, tiny.width, tiny.height);
-    const scaled = document.createElement('canvas');
-    scaled.width = w;
-    scaled.height = h;
-    const sctx = scaled.getContext('2d', { willReadFrequently: true });
-    sctx.imageSmoothingEnabled = false;
-    sctx.drawImage(tiny, 0, 0, w, h);
-    await generateSVGFromCanvasAsync(scaled, style, detail);
-  } else {
-    await generateSVGFromCanvasAsync(outCanvas, style, detail);
-  }
+  lastFrame = ctx.getImageData(0, 0, w, h);
+  lastMask = segmentation.data;
+  editedMask = null;
+  await renderMasked(lastFrame, lastMask);
 
   // Enable download in upload mode after SVG generation completes
   if (currentMode === 'upload') {
     downloadBtn.disabled = false;
   }
+  updateMaskEditAvailability();
 }
 
 async function startCamera() {
@@ -249,12 +254,22 @@ async function processFrame() {
   ctx.drawImage(video, 0, 0, w, h);
 
   const segmentation = await net.segmentPerson(canvas, {internalResolution: 'medium', segmentationThreshold: 0.7});
+  // A frame still in flight when Freeze was pressed must not replace one already being edited
+  if (window.MaskEditor && window.MaskEditor.isOpen) return;
+  lastFrame = ctx.getImageData(0, 0, w, h);
+  lastMask = segmentation.data;
+  editedMask = null;
+  await renderMasked(lastFrame, lastMask);
+}
 
-  const imgData = ctx.getImageData(0,0,w,h);
+// Cut the person out of a frame with the given mask and draw it in the selected style
+async function renderMasked(frame, mask) {
+  const w = frame.width;
+  const h = frame.height;
+  const imgData = new ImageData(new Uint8ClampedArray(frame.data), w, h);
   const data = imgData.data;
-  for (let i=0;i<w*h;i++){
-    const seg = segmentation.data[i];
-    if (!seg) { data[i*4+3] = 0; }
+  for (let i = 0; i < w * h; i++) {
+    if (!mask[i]) data[i * 4 + 3] = 0;
   }
 
   const outCanvas = document.createElement('canvas');
@@ -285,6 +300,8 @@ function takePhoto() {
   isFrozen = !isFrozen;
   takeBtn.textContent = isFrozen ? 'Resume' : 'Freeze';
   downloadBtn.disabled = !isFrozen;
+  if (!isFrozen) editedMask = null; // back to live: hand edits belonged to the frozen frame
+  updateMaskEditAvailability();
 }
 
 // --- CORE VECTOR ENGINE ---
