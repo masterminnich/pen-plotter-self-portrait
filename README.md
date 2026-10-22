@@ -16,7 +16,7 @@ Quick start (from the folder that contains these files):
 python -m http.server 8000
 ```
 
-2) Open http://localhost:8000/pen-plot-app/ in Chrome or Firefox, allow camera access, then use the controls.
+2) Open http://localhost:8000/ in Chrome or Firefox, allow camera access, then use the controls.
 
 Notes:
 - Model files (BodyPix) are downloaded from CDN at runtime — first run may be slow.
@@ -26,6 +26,21 @@ Files:
 - index.html — main UI
 - style.css — simple styling
 - app.js — logic: camera, segmentation, vectorization, download
+- mask-editor.js — brush, cutout history, zoom and view movement
+
+## Photo and cutout workflow
+
+Choose **Camera** and **Start camera**, then **Freeze** when you like the picture, or choose **Upload** and select a photo.
+You can select a photo while background removal is loading; it processes automatically when ready. Loading and processing
+failures appear above the preview with **Try again**. Returning to Upload restores the saved photo and rebuilds its drawing.
+
+On a frozen or uploaded photo, **Refine cutout** opens the brush. Highlighted areas stay in the drawing:
+**Keep** adds areas and **Remove** erases them. The toolbar stays below the photo. Use **View** to zoom to 2× or 4×,
+then **Move view** to drag around without painting. Pick Keep or Remove to paint again.
+
+**Done** keeps your edits and Undo history. **Reset** restores the automatic cutout and can itself be undone.
+Resume, a new upload, or a mode change clears hand edits and history. Style and Detail changes preserve them.
+Downloads and starting a plot wait for the current drawing to finish updating.
 
 ## Plotter panel (optional)
 
@@ -85,10 +100,14 @@ for the tests.
 
 ```bash
 node --test                                   # unit and end-to-end tests (Node 18+, no installs)
-node tools/style-report.js                    # savings and estimates for all 13 styles
+node tools/style-report.js                    # savings and estimates for all 12 styles
+node tools/ui-check.js http://localhost:8000/   # cutout, upload, camera and layout checks (needs Playwright + Chrome)
 python3 tools/browser_check.py                # headless Chrome check of the real page (needs playwright)
 python3 tools/capture_fixtures.py             # re-capture the style SVGs used by the tests
 ```
+
+The UI check uses a simulated camera. Install the Node `playwright` package separately, or set `PLAYWRIGHT_MODULE`
+to an existing installation. Set `UI_SHOTS` to a directory to save desktop and mobile screenshots.
 
 The test portrait (`test/fixtures/portrait-sally-ride-nasa-public-domain.jpg`) is NASA's official 1984 portrait of
 Sally Ride, which is in the public domain.

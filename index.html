@@ -9,17 +9,25 @@
 </head>
 <body>
   <main>
-    <h1>Pen Plotter Self-Portrait</h1>
+    <header class="page-header">
+      <div><h1>Pen Plotter Self-Portrait</h1><p>Turn a photo into a drawing you can plot.</p></div>
+      <span class="privacy-note">Your photos stay in your browser</span>
+    </header>
 
     <div class="controls">
-      <div class="mode-toggle">
-        <button id="mode-camera" class="mode-btn active">Camera</button>
-        <button id="mode-upload" class="mode-btn">Upload</button>
+      <div class="control-group" role="group" aria-label="Photo">
+        <span class="group-label">Photo</span>
+        <div class="mode-toggle">
+          <button id="mode-camera" class="mode-btn active" aria-pressed="true">Camera</button>
+          <button id="mode-upload" class="mode-btn" aria-pressed="false">Upload</button>
+        </div>
+        <input type="file" id="file-upload" accept="image/*" hidden>
+        <button id="upload-btn" hidden>Choose photo</button>
+        <button id="start-camera" disabled>Start camera</button>
+        <button id="take-photo" disabled>Freeze</button>
       </div>
-      <input type="file" id="file-upload" accept="image/*" style="display:none">
-      <button id="upload-btn" style="display:none">Choose Image</button>
-      <button id="start-camera">Start Camera</button>
-      <button id="take-photo" disabled>Freeze</button>
+      <div class="control-group" role="group" aria-label="Drawing style">
+      <label class="group-label" for="style-select">Drawing style</label>
       <select id="style-select">
         <option value="outline">Outline</option>
         <option value="blueprint">Technical Blueprint</option>
@@ -35,21 +43,37 @@
         <option value="composition">Bauhaus Composition</option>
       </select>
       <label>Detail: <input id="detail" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+      </div>
+      <div class="control-group export-group" role="group" aria-label="Export">
+      <span class="group-label">Export</span>
       <button id="download-svg" disabled>Download SVG</button>
       <button id="plotter-toggle" type="button" aria-expanded="false" title="Time estimate, path optimization and NextDraw control">Plotter</button>
+      </div>
+    </div>
+    <div class="status-bar" data-state="busy">
+      <span id="app-status" role="status" aria-live="polite">Loading background removal…</span>
+      <button id="retry-action" type="button" hidden>Try again</button>
     </div>
 
     <div class="viewport">
       <section id="camera-section">
-        <h2 id="source-label">Camera</h2>
+        <div class="section-heading"><h2 id="source-label">Camera</h2><div id="cutout-action"></div></div>
         <div class="video-container">
-          <video id="video" autoplay playsinline></video>
-          <img id="uploaded-image" style="display:none; max-width:100%; max-height:100%; object-fit:contain;">
+          <video id="video" autoplay playsinline muted hidden></video>
+          <img id="uploaded-image" alt="Your selected photo" hidden>
+          <canvas id="frozen-frame" aria-label="Frozen camera photo" hidden></canvas>
+          <div id="source-empty" class="empty-state">
+            <span class="empty-mark" aria-hidden="true">◎</span>
+            <strong>Begin with a portrait</strong>
+            <p>Use your camera or choose a photo.<br>A clear face and good light work best.</p>
+            <div class="empty-actions"><button id="empty-camera" type="button" disabled>Start camera</button><button id="empty-upload" type="button">Choose photo</button></div>
+          </div>
         </div>
+        <div id="cutout-tools"></div>
       </section>
 
       <section id="preview-section">
-        <h2>Output</h2>
+        <div class="section-heading"><h2>Drawing</h2></div>
         <div id="preview"></div>
       </section>
     </div>
@@ -63,6 +87,7 @@
   <!-- ImageTracer for vectorization -->
   <script src="https://unpkg.com/imagetracerjs@1.2.4/imagetracer_v1.2.4.js"></script>
   <script src="app.js"></script>
+  <script src="mask-editor.js"></script>
   <!-- Optional Plotter panel (estimate, optimization, NextDraw control). Does nothing until opened. -->
   <script src="plotter/svgpath.js"></script>
   <script src="plotter/optimize.js"></script>
