@@ -1,33 +1,12 @@
-// app.js — camera capture -> person segmentation -> vectorize -> SVG download
-let video = null;
-let startBtn = null;
-let takeBtn = null;
-let downloadBtn = null;
-let styleSelect = null;
-let detailRange = null;
-let preview = null;
-let canvas = null;
-let ctx = null;
-let net = null;
-let isFrozen = false;
-let livePreviewId = null;
-
-// The still being shown: raw pixels, the AI person mask, and any hand edits (mask-editor.js)
-let lastFrame = null;   // ImageData
-let lastMask = null;    // 1 = person, per pixel
-let editedMask = null;  // replaces lastMask once the brush has been used
-let stillRendering = false;
-let stillPending = false;
-
-// Mode and upload
-let currentMode = 'camera'; // 'camera' or 'upload'
-let uploadedImage = null;
-let fileInput = null;
-let uploadBtn = null;
-let modeCameraBtn = null;
-let modeUploadBtn = null;
-let sourceLabel = null;
-let uploadedImageEl = null;
+// Camera capture -> person cutout -> drawing -> SVG download.
+let video, startBtn, takeBtn, downloadBtn, styleSelect, detailRange, preview, canvas, ctx;
+let fileInput, uploadBtn, modeCameraBtn, modeUploadBtn, sourceLabel, uploadedImageEl;
+let net = null, modelPromise = null, modelState = 'loading';
+let currentMode = 'camera', uploadedImage = null, isFrozen = false;
+let lastFrame = null, lastMask = null, editedMask = null;
+let sourceVersion = 0, renderVersion = 0, liveVersion = 0;
+let livePreviewId = null, stillTask = null, stillPending = false;
+let uploadTask = null, sourceBusy = null, cameraStarting = null, appError = null;
 
 async function init() {
   video = document.getElementById('video');
@@ -39,8 +18,6 @@ async function init() {
   preview = document.getElementById('preview');
   canvas = document.getElementById('capture-canvas');
   ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-  // Mode/upload elements
   fileInput = document.getElementById('file-upload');
   uploadBtn = document.getElementById('upload-btn');
   modeCameraBtn = document.getElementById('mode-camera');
@@ -48,260 +25,337 @@ async function init() {
   sourceLabel = document.getElementById('source-label');
   uploadedImageEl = document.getElementById('uploaded-image');
 
-  // Event listeners
   startBtn.addEventListener('click', startCamera);
   takeBtn.addEventListener('click', takePhoto);
   downloadBtn.addEventListener('click', downloadSVG);
-  
-  // Mode switching
   modeCameraBtn.addEventListener('click', () => switchMode('camera'));
   modeUploadBtn.addEventListener('click', () => switchMode('upload'));
   uploadBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', handleFileUpload);
-  
-  // Style/detail changes redraw a still (upload or frozen frame) from its kept mask
+  document.getElementById('empty-camera').addEventListener('click', startCamera);
+  document.getElementById('empty-upload').addEventListener('click', () => {
+    switchMode('upload'); fileInput.click();
+  });
+  document.getElementById('retry-action').addEventListener('click', retryAction);
   styleSelect.addEventListener('change', redrawStillOnChange);
   detailRange.addEventListener('input', redrawStillOnChange);
+  clearPreview();
+  updateUI();
+  try { await loadModel(); }
+  catch (err) { showError('Background removal could not load. Check your connection and try again.', 'model'); }
+}
 
-  // Load BodyPix model in background
-  net = await bodyPix.load({architecture: 'MobileNetV1', outputStride: 16, multiplier: 0.75, quantBytes: 2});
+function showError(message, retry) {
+  appError = { message, retry };
+  updateUI();
+}
+
+function loadModel() {
+  if (net) return Promise.resolve(net);
+  if (modelPromise) return modelPromise;
+  modelState = 'loading';
+  updateUI();
+  modelPromise = Promise.resolve().then(() => bodyPix.load({
+    architecture: 'MobileNetV1', outputStride: 16, multiplier: 0.75, quantBytes: 2
+  })).then(model => {
+    net = model; modelState = 'ready';
+    if (appError && appError.retry === 'model') appError = null;
+    return model;
+  }).catch(err => {
+    modelState = 'error';
+    throw err;
+  }).finally(() => { modelPromise = null; updateUI(); });
+  return modelPromise;
+}
+
+async function retryAction() {
+  const action = appError && appError.retry;
+  appError = null;
+  updateUI();
+  if (action === 'camera') {
+    if (video.srcObject && currentMode === 'camera') { startLivePreview(); return; }
+    return startCamera();
+  }
+  if (action === 'render') return rerenderStill();
+  if (action === 'file') { fileInput.click(); return; }
+  try { await loadModel(); }
+  catch (err) { showError('Background removal could not load. Check your connection and try again.', 'model'); return; }
+  if (currentMode === 'upload' && uploadedImage) await processUploadedImage();
+  else if (video.srcObject && !isFrozen) startLivePreview();
+}
+
+function clearPreview() {
+  preview.dataset.svg = '';
+  preview.innerHTML = '<div class="empty-state"><span class="empty-mark" aria-hidden="true">✳</span><strong>Your drawing appears here</strong><p>Choose a photo, then explore the drawing styles.</p></div>';
+}
+
+function updateUI() {
+  if (!preview) return;
+  const camera = currentMode === 'camera', stream = !!video.srcObject;
+  const busy = sourceBusy !== null || !!stillTask;
+  startBtn.hidden = !camera;
+  startBtn.disabled = modelState !== 'ready' || cameraStarting !== null || stream;
+  takeBtn.hidden = !camera;
+  takeBtn.disabled = !stream || !lastFrame;
+  takeBtn.textContent = isFrozen ? 'Resume' : 'Freeze';
+  uploadBtn.hidden = camera;
+  video.hidden = !camera || isFrozen || !stream;
+  uploadedImageEl.hidden = camera || !uploadedImage;
+  document.getElementById('frozen-frame').hidden = !camera || !isFrozen;
+  document.getElementById('source-empty').hidden = camera ? stream : !!uploadedImage;
+  document.getElementById('empty-camera').disabled = startBtn.disabled;
+  downloadBtn.disabled = !preview.dataset.svg || busy || (camera && !isFrozen) || !!appError;
+  const ready = String(!!preview.dataset.svg && !busy && !appError);
+  if (preview.dataset.ready !== ready) preview.dataset.ready = ready;
+  document.getElementById('preview-section').setAttribute('aria-busy', String(busy));
+  sourceLabel.textContent = camera ? (isFrozen ? 'Frozen photo' : 'Camera') : 'Photo';
+  for (const [btn, active] of [[modeCameraBtn, camera], [modeUploadBtn, !camera]]) {
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', String(active));
+  }
+  let message;
+  if (appError) message = appError.message;
+  else if (modelState === 'loading') message = uploadedImage ? 'Photo selected. Loading background removal…' : 'Loading background removal… You can choose a photo while you wait.';
+  else if (cameraStarting !== null) message = 'Starting camera…';
+  else if (sourceBusy !== null) message = 'Removing the background…';
+  else if (stillTask) message = 'Updating your drawing…';
+  else if (camera && stream) message = isFrozen ? 'Photo frozen. Refine the cutout or choose a drawing style.' : 'Camera is live. Freeze a photo when you’re ready.';
+  else if (!camera && lastFrame) message = 'Ready. Refine the cutout, explore styles, or download your drawing.';
+  else message = 'Start your camera or choose a photo to begin.';
+  const status = document.getElementById('app-status');
+  if (status.textContent !== message) status.textContent = message;
+  status.parentElement.dataset.state = appError ? 'error' : (busy || modelState === 'loading' ? 'busy' : 'ready');
+  document.getElementById('retry-action').hidden = !appError;
+  updateMaskEditAvailability();
+}
+
+function stopLivePreview() {
+  liveVersion++;
+  if (livePreviewId) cancelAnimationFrame(livePreviewId);
+  livePreviewId = null;
+}
+
+// Every source change invalidates all outstanding segmentation and drawing work.
+function invalidateSource() {
+  sourceVersion++; renderVersion++;
+  stillPending = false; sourceBusy = null; cameraStarting = null;
+  appError = modelState === 'error' ? { message: 'Background removal could not load. Check your connection and try again.', retry: 'model' } : null;
+  stopLivePreview();
+  if (window.MaskEditor) window.MaskEditor.reset();
+  lastFrame = lastMask = editedMask = null;
+  clearPreview();
 }
 
 function switchMode(mode) {
-  currentMode = mode;
-  
-  // Update toggle buttons and animation
-  const modeToggle = document.querySelector('.mode-toggle');
-  modeToggle.setAttribute('data-mode', mode);
-  
-  // Update toggle buttons
-  modeCameraBtn.classList.toggle('active', mode === 'camera');
-  modeUploadBtn.classList.toggle('active', mode === 'upload');
-  
-  // Show/hide appropriate controls
-  if (mode === 'camera') {
-    startBtn.style.display = '';
-    startBtn.disabled = false;
-    takeBtn.style.display = '';
-    takeBtn.disabled = true;
-    takeBtn.textContent = 'Freeze';
-    uploadBtn.style.display = 'none';
-    video.style.display = '';
-    uploadedImageEl.style.display = 'none';
-    sourceLabel.textContent = 'Camera';
-    downloadBtn.disabled = true;
-    
-    // Stop any live preview
-    isFrozen = false;
-    if (livePreviewId) cancelAnimationFrame(livePreviewId);
-    livePreviewId = null;
-  } else {
-    startBtn.style.display = 'none';
-    takeBtn.style.display = '';
-    // In upload mode the Freeze control is not applicable — keep it deactivated
-    takeBtn.disabled = true;
-    takeBtn.textContent = 'Freeze';
-    uploadBtn.style.display = '';
-    video.style.display = 'none';
-    uploadedImageEl.style.display = uploadedImage ? '' : 'none';
-    sourceLabel.textContent = 'Image';
-    // Downloads become available after the uploaded image is processed into an SVG
-    downloadBtn.disabled = true;
-    
-    // Stop camera stream if running
-    if (video.srcObject) {
-      video.srcObject.getTracks().forEach(track => track.stop());
-      video.srcObject = null;
-    }
-    if (livePreviewId) cancelAnimationFrame(livePreviewId);
-    livePreviewId = null;
-    isFrozen = false;
+  if (mode === currentMode) return;
+  invalidateSource();
+  if (video.srcObject) {
+    video.srcObject.getTracks().forEach(track => track.stop());
+    video.srcObject = null;
   }
-  
-  // Clear preview
-  preview.innerHTML = '';
-  preview.dataset.svg = '';
-  lastFrame = null;
-  lastMask = null;
-  editedMask = null;
-  updateMaskEditAvailability();
+  currentMode = mode; isFrozen = false;
+  updateUI();
+  if (mode === 'upload' && uploadedImage) processUploadedImage();
 }
 
 function redrawStillOnChange() {
-  if (currentMode === 'upload' && uploadedImage) {
-    if (lastFrame) rerenderStill(); else processUploadedImage();
-  } else if (currentMode === 'camera' && isFrozen && lastFrame) {
-    rerenderStill();
-  }
+  if ((currentMode === 'upload' || isFrozen) && lastFrame) return rerenderStill();
+  if (currentMode === 'upload' && uploadedImage) return processUploadedImage();
 }
 
-// Redraw the current still with the edited (or AI) mask; one render at a time, the newest wins
-async function rerenderStill() {
-  if (!lastFrame) return;
-  if (stillRendering) { stillPending = true; return; }
-  stillRendering = true;
-  try {
-    do {
+// Coalesce brush/slider requests. Each render keeps its own frame and mask snapshot;
+// callbacks may publish only while both their source and revision are still current.
+function rerenderStill() {
+  if (!lastFrame || !lastMask || (currentMode === 'camera' && !isFrozen)) return Promise.resolve();
+  renderVersion++;
+  stillPending = true;
+  if (stillTask) return stillTask;
+  stillTask = Promise.resolve().then(async () => {
+    while (stillPending && lastFrame && (currentMode === 'upload' || isFrozen)) {
       stillPending = false;
-      await renderMasked(lastFrame, editedMask || lastMask);
-    } while (stillPending);
-  } finally {
-    stillRendering = false;
-  }
+      const source = sourceVersion, revision = renderVersion;
+      const frame = lastFrame, mask = (editedMask || lastMask).slice();
+      const current = () => source === sourceVersion && revision === renderVersion && frame === lastFrame;
+      try {
+        await renderMasked(frame, mask, current);
+        if (current() && appError && appError.retry === 'render') appError = null;
+      } catch (err) {
+        if (current()) showError('The drawing could not update. Try again or choose another style.', 'render');
+      }
+    }
+  }).finally(() => { stillTask = null; updateUI(); });
+  updateUI();
+  return stillTask;
 }
 
 function updateMaskEditAvailability() {
-  if (!window.MaskEditor) return;
-  const still = currentMode === 'upload' ? !!uploadedImage : isFrozen;
-  window.MaskEditor.setAvailable(!!lastFrame && still);
+  if (window.MaskEditor) window.MaskEditor.setAvailable(!!lastFrame && !!lastMask && sourceBusy === null && (currentMode === 'upload' || isFrozen));
 }
 
-function handleFileUpload(e) {
+async function handleFileUpload(e) {
   const file = e.target.files[0];
+  fileInput.value = ''; // Choosing the same file again should work.
   if (!file) return;
-  
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    uploadedImage = new Image();
-    uploadedImage.onload = () => {
-      uploadedImageEl.src = uploadedImage.src;
-      uploadedImageEl.style.display = '';
-      // Freeze is not applicable for uploads — keep the button deactivated
-      takeBtn.disabled = true;
-      isFrozen = false;
-      takeBtn.textContent = 'Freeze';
-      downloadBtn.disabled = true;
-      lastFrame = null;
-      lastMask = null;
-      editedMask = null;
-      updateMaskEditAvailability();
-
-      // Auto-process the image
-      processUploadedImage();
-    };
-    uploadedImage.src = event.target.result;
-  };
-  reader.readAsDataURL(file);
+  if (file.type && !file.type.startsWith('image/')) {
+    showError('Choose an image file, such as a JPG or PNG.', 'file'); return;
+  }
+  invalidateSource();
+  const source = sourceVersion;
+  uploadedImage = null;
+  sourceBusy = source;
+  updateUI();
+  try {
+    const data = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('File read failed'));
+      reader.readAsDataURL(file);
+    });
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Image decode failed'));
+      img.src = data;
+    });
+    if (source !== sourceVersion || currentMode !== 'upload') return;
+    uploadedImage = image;
+    uploadedImageEl.src = image.src;
+    sourceBusy = null;
+    await processUploadedImage();
+  } catch (err) {
+    if (source === sourceVersion) showError('This photo could not be opened. Try a JPG or PNG image.', 'file');
+  } finally {
+    if (sourceBusy === source) sourceBusy = null;
+    updateUI();
+  }
 }
 
-async function processUploadedImage() {
-  if (!uploadedImage) return;
-  
-  // Resize to reasonable dimensions
-  const maxDim = 640;
-  let w = uploadedImage.naturalWidth;
-  let h = uploadedImage.naturalHeight;
-  
-  if (w > maxDim || h > maxDim) {
-    if (w > h) {
-      h = Math.round(h * (maxDim / w));
-      w = maxDim;
-    } else {
-      w = Math.round(w * (maxDim / h));
-      h = maxDim;
+function processUploadedImage() {
+  if (!uploadedImage || currentMode !== 'upload') return Promise.resolve();
+  const source = sourceVersion, image = uploadedImage;
+  if (uploadTask && uploadTask.source === source) return uploadTask.promise;
+  sourceBusy = source;
+  appError = null;
+  const task = { source };
+  task.promise = Promise.resolve().then(async () => {
+    try {
+      const model = await loadModel();
+      if (source !== sourceVersion || currentMode !== 'upload') return;
+      const scale = Math.min(1, 640 / Math.max(image.naturalWidth, image.naturalHeight));
+      const w = Math.max(1, Math.round(image.naturalWidth * scale)), h = Math.max(1, Math.round(image.naturalHeight * scale));
+      const capture = document.createElement('canvas');
+      capture.width = w; capture.height = h;
+      const context = capture.getContext('2d', { willReadFrequently: true });
+      context.drawImage(image, 0, 0, w, h);
+      const frame = context.getImageData(0, 0, w, h);
+      const segmentation = await model.segmentPerson(capture, {internalResolution: 'medium', segmentationThreshold: 0.7});
+      if (source !== sourceVersion || currentMode !== 'upload') return;
+      lastFrame = frame; lastMask = segmentation.data; editedMask = null;
+      await rerenderStill();
+    } catch (err) {
+      if (source === sourceVersion) showError(modelState === 'error' ? 'Background removal could not load. Check your connection and try again.' : 'The photo could not be processed. Try again or choose another photo.', modelState === 'error' ? 'model' : 'upload');
+    } finally {
+      if (sourceBusy === source) sourceBusy = null;
+      if (uploadTask === task) uploadTask = null;
+      updateUI();
     }
-  }
-  
-  canvas.width = w;
-  canvas.height = h;
-  ctx.drawImage(uploadedImage, 0, 0, w, h);
-  
-  // Run segmentation
-  const segmentation = await net.segmentPerson(canvas, {internalResolution: 'medium', segmentationThreshold: 0.7});
-  lastFrame = ctx.getImageData(0, 0, w, h);
-  lastMask = segmentation.data;
-  editedMask = null;
-  await renderMasked(lastFrame, lastMask);
-
-  // Enable download in upload mode after SVG generation completes
-  if (currentMode === 'upload') {
-    downloadBtn.disabled = false;
-  }
-  updateMaskEditAvailability();
+  });
+  uploadTask = task;
+  updateUI();
+  return task.promise;
 }
 
 async function startCamera() {
+  if (cameraStarting !== null || video.srcObject || currentMode !== 'camera') return;
+  const source = sourceVersion;
+  cameraStarting = source; appError = null;
+  updateUI();
   try {
+    await loadModel();
+    if (source !== sourceVersion || currentMode !== 'camera') return;
     const stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'user'}, audio: false});
+    if (source !== sourceVersion || currentMode !== 'camera') { stream.getTracks().forEach(track => track.stop()); return; }
     video.srcObject = stream;
     await video.play();
-    takeBtn.disabled = false;
-    takeBtn.textContent = 'Freeze';
-    startBtn.disabled = true;
+    if (source !== sourceVersion || currentMode !== 'camera') return;
     isFrozen = false;
     startLivePreview();
   } catch (err) {
-    alert('Could not start camera: ' + err.message);
+    if (source === sourceVersion) {
+      if (video.srcObject) { video.srcObject.getTracks().forEach(track => track.stop()); video.srcObject = null; }
+      showError(modelState === 'error' ? 'Background removal could not load. Check your connection and try again.' : 'The camera could not start. Check camera access in your browser, or upload a photo.', modelState === 'error' ? 'model' : 'camera');
+    }
+  } finally {
+    if (cameraStarting === source) cameraStarting = null;
+    updateUI();
   }
 }
 
 function startLivePreview() {
-  if (livePreviewId) cancelAnimationFrame(livePreviewId);
+  stopLivePreview();
+  const loopVersion = liveVersion;
   async function loop() {
-    if (!isFrozen && video.readyState === 4) {
-      await processFrame();
-    }
-    livePreviewId = requestAnimationFrame(loop);
+    if (loopVersion !== liveVersion || currentMode !== 'camera' || isFrozen || !video.srcObject) return;
+    await processFrame();
+    if (loopVersion === liveVersion && currentMode === 'camera' && !isFrozen && video.srcObject && !appError) livePreviewId = requestAnimationFrame(loop);
   }
-  loop();
+  livePreviewId = requestAnimationFrame(loop);
 }
 
 async function processFrame() {
-  const w = video.videoWidth || 640;
-  const h = video.videoHeight || 480;
-  if (canvas.width !== w) canvas.width = w;
-  if (canvas.height !== h) canvas.height = h;
+  if (!net || isFrozen || currentMode !== 'camera' || video.readyState < 2) return;
+  const source = sourceVersion;
+  const w = video.videoWidth || 640, h = video.videoHeight || 480;
+  canvas.width = w; canvas.height = h;
   ctx.drawImage(video, 0, 0, w, h);
-
-  const segmentation = await net.segmentPerson(canvas, {internalResolution: 'medium', segmentationThreshold: 0.7});
-  // A frame still in flight when Freeze was pressed must not replace one already being edited
-  if (window.MaskEditor && window.MaskEditor.isOpen) return;
-  lastFrame = ctx.getImageData(0, 0, w, h);
-  lastMask = segmentation.data;
-  editedMask = null;
-  await renderMasked(lastFrame, lastMask);
+  const frame = ctx.getImageData(0, 0, w, h);
+  try {
+    const segmentation = await net.segmentPerson(canvas, {internalResolution: 'medium', segmentationThreshold: 0.7});
+    if (source !== sourceVersion || isFrozen || currentMode !== 'camera') return;
+    lastFrame = frame; lastMask = segmentation.data; editedMask = null;
+    const revision = ++renderVersion;
+    updateUI();
+    await renderMasked(frame, lastMask, () => source === sourceVersion && revision === renderVersion && !isFrozen);
+  } catch (err) {
+    if (source === sourceVersion) showError('The camera picture could not be processed. Try again or upload a photo.', 'camera');
+  }
 }
 
-// Cut the person out of a frame with the given mask and draw it in the selected style
-async function renderMasked(frame, mask) {
-  const w = frame.width;
-  const h = frame.height;
+async function renderMasked(frame, mask, current = () => true) {
+  const w = frame.width, h = frame.height;
   const imgData = new ImageData(new Uint8ClampedArray(frame.data), w, h);
-  const data = imgData.data;
-  for (let i = 0; i < w * h; i++) {
-    if (!mask[i]) data[i * 4 + 3] = 0;
-  }
-
+  for (let i = 0; i < w * h; i++) if (!mask[i]) imgData.data[i * 4 + 3] = 0;
   const outCanvas = document.createElement('canvas');
   outCanvas.width = w; outCanvas.height = h;
-  const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
-  outCtx.putImageData(imgData, 0, 0);
-
-  const style = styleSelect.value;
-  const detail = parseFloat(detailRange.value);
-
+  outCanvas.getContext('2d', { willReadFrequently: true }).putImageData(imgData, 0, 0);
+  const style = styleSelect.value, detail = parseFloat(detailRange.value);
   if (style === 'pixel') {
-    const px = Math.max(24, Math.floor(64 + detail * 256));
     const tiny = document.createElement('canvas');
-    tiny.width = px; tiny.height = Math.round(px * h / w);
+    tiny.width = Math.max(24, Math.floor(64 + detail * 256)); tiny.height = Math.round(tiny.width * h / w);
     const tctx = tiny.getContext('2d', { willReadFrequently: true });
     tctx.imageSmoothingEnabled = false;
     tctx.drawImage(outCanvas, 0, 0, tiny.width, tiny.height);
     const scaled = document.createElement('canvas'); scaled.width = w; scaled.height = h;
     const sctx = scaled.getContext('2d', { willReadFrequently: true }); sctx.imageSmoothingEnabled = false;
     sctx.drawImage(tiny, 0, 0, w, h);
-    await generateSVGFromCanvasAsync(scaled, style, detail);
-  } else {
-    await generateSVGFromCanvasAsync(outCanvas, style, detail);
-  }
+    await generateSVGFromCanvasAsync(scaled, style, detail, current);
+  } else await generateSVGFromCanvasAsync(outCanvas, style, detail, current);
 }
 
 function takePhoto() {
-  isFrozen = !isFrozen;
-  takeBtn.textContent = isFrozen ? 'Resume' : 'Freeze';
-  downloadBtn.disabled = !isFrozen;
-  if (!isFrozen) editedMask = null; // back to live: hand edits belonged to the frozen frame
-  updateMaskEditAvailability();
+  if (!lastFrame || currentMode !== 'camera') return;
+  if (isFrozen) {
+    invalidateSource(); isFrozen = false;
+    updateUI(); startLivePreview();
+  } else {
+    sourceVersion++; renderVersion++;
+    stopLivePreview(); isFrozen = true; appError = null;
+    const frozen = document.getElementById('frozen-frame');
+    frozen.width = lastFrame.width; frozen.height = lastFrame.height;
+    frozen.getContext('2d').putImageData(lastFrame, 0, 0);
+    rerenderStill();
+    updateUI();
+  }
 }
 
 // --- CORE VECTOR ENGINE ---
@@ -827,8 +881,8 @@ function finalizeSVG(svg) {
   preview.dataset.svg = finalSVG;
 }
 
-function generateSVGFromCanvasAsync(sourceCanvas, style, detail) {
-  return new Promise((resolve) => {
+function generateSVGFromCanvasAsync(sourceCanvas, style, detail, current = () => true) {
+  return new Promise((resolve, reject) => {
     const w = sourceCanvas.width;
     const h = sourceCanvas.height;
 
@@ -837,7 +891,7 @@ function generateSVGFromCanvasAsync(sourceCanvas, style, detail) {
     if (generator) {
       const svg = makeSVGElement(w, h);
       generator(sourceCanvas, detail).forEach(p => svg.appendChild(p));
-      finalizeSVG(svg);
+      if (current()) finalizeSVG(svg);
       resolve();
       return;
     }
@@ -854,23 +908,22 @@ function generateSVGFromCanvasAsync(sourceCanvas, style, detail) {
     };
 
     ImageTracer.imageToSVG(dataURL, function(svgstr) {
-      let parser = new DOMParser();
-      let doc = parser.parseFromString(svgstr, 'image/svg+xml');
-      let svg = doc.querySelector('svg');
-      if (!svg) { resolve(); return; }
-
-      svg.setAttribute('width', w);
-      svg.setAttribute('height', h);
-      svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-
-      svg.querySelectorAll('path').forEach(p => {
-        p.setAttribute('fill', 'none');
-        p.setAttribute('stroke', '#000');
-        p.setAttribute('stroke-width', '1');
-      });
-
-      finalizeSVG(svg);
-      resolve();
+      try {
+        if (!current()) { resolve(); return; }
+        const doc = new DOMParser().parseFromString(svgstr, 'image/svg+xml');
+        const svg = doc.querySelector('svg');
+        if (!svg || doc.querySelector('parsererror')) throw new Error('Invalid drawing');
+        svg.setAttribute('width', w);
+        svg.setAttribute('height', h);
+        svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+        svg.querySelectorAll('path').forEach(p => {
+          p.setAttribute('fill', 'none');
+          p.setAttribute('stroke', '#000');
+          p.setAttribute('stroke-width', '1');
+        });
+        if (current()) finalizeSVG(svg);
+        resolve();
+      } catch (err) { reject(err); }
     }, options);
   });
 }
@@ -969,7 +1022,7 @@ function createPathElement(d) {
 
 function downloadSVG() {
   const svg = preview.dataset.svg;
-  if (!svg) return;
+  if (!svg || downloadBtn.disabled) return;
   const blob = new Blob([svg], {type: 'image/svg+xml'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

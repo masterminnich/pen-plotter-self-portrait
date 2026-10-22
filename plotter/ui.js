@@ -363,6 +363,7 @@
 
   function onSvgMaybeChanged() {
     if (!open) return;
+    updateButtons();
     const svg = (document.getElementById('preview') || {}).dataset ? document.getElementById('preview').dataset.svg || '' : '';
     drawPaperBorder(); // the sheet doesn't depend on the drawing, so keep it steady between live frames
     if (svg === lastSvg) { drawTravelOverlay(); return; }
@@ -528,7 +529,7 @@
   }
 
   function currentOptimizedPrep() {
-    if (!lastSvg) return null;
+    if (!lastSvg || document.getElementById('preview').dataset.ready === 'false') return null;
     if (lastOptimizedPrep && lastOptimizedPrep === lastPrep) return lastOptimizedPrep;
     lastOptimizedPrep = lastPrep = L.preparePlot(lastSvg, settings, { optimize: settings.optimize.enabled });
     renderEstimate(lastPrep, settings.optimize.enabled ? 'optimized' : 'not optimized');
@@ -724,7 +725,7 @@
     panel.querySelectorAll('[data-needs="idle"]').forEach(b => { b.disabled = !connected || busy; });
     panel.querySelectorAll('[data-needs="running"]').forEach(b => { b.disabled = !connected || !busy || (mgr && !mgr.busy); });
     $('pl-connect').disabled = busy;
-    const hasDrawing = !!lastSvg;
+    const hasDrawing = !!lastSvg && document.getElementById('preview').dataset.ready !== 'false';
     $('pl-dl-svg').disabled = !hasDrawing;
     $('pl-dl-gcode').disabled = !hasDrawing;
     if (connected && !hasDrawing) { $('pl-start').disabled = true; $('pl-dry').disabled = true; }
@@ -892,7 +893,7 @@
     }
     // Watch the app's output. The observer callback is a no-op while the panel is closed.
     const preview = document.getElementById('preview');
-    if (preview) new MutationObserver(() => { if (open) onSvgMaybeChanged(); }).observe(preview, { childList: true });
+    if (preview) new MutationObserver(() => { if (open) onSvgMaybeChanged(); }).observe(preview, { childList: true, attributes: true, attributeFilter: ['data-ready'] });
     updateButtons();
     // Always start closed; ?plotter=1 (or the mock) opens it for testing.
     if (params.get('plotter') === '1' || MOCK) setOpen(true);
