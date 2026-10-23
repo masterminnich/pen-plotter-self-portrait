@@ -4,7 +4,6 @@
   'use strict';
 
   const MIN_R = 2, MAX_R = 80, UNDO_LIMIT = 40;
-  const ADD_RGB = [20, 184, 166];   // teal outline of the person
   const BRUSH_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.4 2.6a2 2 0 0 1 2.9 2.9L11 15.8 8.2 13z"/><path d="M7.1 14.2c-1.8 0-3.2 1.5-3.2 3.3 0 1.4-1.3 2.2-2 2.5 1 1.3 2.6 2 4.3 2 2.4 0 4.3-1.9 4.3-4.3 0-.3 0-.6-.1-.9z"/></svg>';
 
   let container, stage, surface, editBtn, canvas, cctx, cursor, toolbar, sizeInput, addBtn, eraseBtn, undoBtn, resetBtn, panBtn, zoomInput;
@@ -20,14 +19,12 @@
     container = document.querySelector('.video-container');
     if (!container) return false;
     document.getElementById('cutout-action').insertAdjacentHTML('beforeend', `
-      <button type="button" class="mask-edit-btn" hidden title="Correct which parts of the photo appear in your drawing">${BRUSH_ICON}<span>Refine cutout</span></button>`);
+      <button type="button" class="mask-edit-btn" hidden aria-expanded="false" aria-controls="mask-toolbar" title="Correct which parts of the photo appear in your drawing">${BRUSH_ICON}<span>Edit cutout</span></button>`);
     container.insertAdjacentHTML('beforeend', `
       <div class="mask-stage" hidden><div class="mask-surface"><canvas class="mask-canvas" aria-label="Paint on the photo to keep or remove areas"></canvas></div></div>
       <div class="mask-cursor" hidden></div>`);
     document.getElementById('cutout-tools').innerHTML = `
-      <div class="mask-tools" hidden>
-        <p class="mask-tip" id="mask-help">Highlighted areas stay in the drawing. Brush to keep or remove parts of the photo.</p>
-        <div class="mask-toolbar" role="group" aria-label="Cutout tools">
+      <div id="mask-toolbar" class="mask-tools mask-toolbar" role="group" aria-label="Cutout tools" hidden>
           <div class="mask-seg">
             <button type="button" data-mode="add" title="Keep in the drawing (A)"><b>+</b> Keep</button>
             <button type="button" data-mode="erase" title="Remove from the drawing (E)"><b>−</b> Remove</button>
@@ -35,13 +32,10 @@
           <label class="mask-size">Brush <input type="range" min="${MIN_R}" max="${MAX_R}" step="1" aria-label="Brush size"></label>
           <button type="button" data-act="undo" title="Undo (Ctrl/⌘ Z)">Undo</button>
           <button type="button" data-act="reset" title="Restore the automatic cutout">Reset</button>
-          <button type="button" data-act="done" class="mask-done">Done</button>
-        </div>
-        <div class="mask-view-controls">
           <label>View <select aria-label="Photo zoom"><option value="1">Fit</option><option value="2">2×</option><option value="4">4×</option></select></label>
           <button type="button" data-act="pan" aria-pressed="false">Move view</button>
-          <details><summary>Shortcuts</summary><p>A: Keep · E: Remove · X: swap · Alt/Option: swap temporarily · [ / ] or scroll: brush size · Ctrl/⌘ Z: undo · Esc: done</p></details>
-        </div>
+          <details class="mask-help"><summary aria-label="Cutout help" title="Cutout help and keyboard shortcuts">?</summary><div><p id="mask-help">Bright areas stay in the drawing. Keep adds to the cutout; Remove erases from it.</p><p>A: Keep · E: Remove · X: swap · Alt/Option: swap temporarily · [ / ] or scroll: brush size · Ctrl/⌘ Z: undo · Esc: done</p></div></details>
+          <button type="button" data-act="done" class="mask-done">Done</button>
       </div>`;
     editBtn = document.querySelector('.mask-edit-btn');
     stage = container.querySelector('.mask-stage');
@@ -64,7 +58,7 @@
     stage.addEventListener('scroll', () => { cursor.hidden = true; });
     sizeInput.value = radius;
 
-    editBtn.addEventListener('click', open);
+    editBtn.addEventListener('click', () => { if (isOpen) close(); else open(); });
     addBtn.addEventListener('click', () => setMode('add'));
     eraseBtn.addEventListener('click', () => setMode('erase'));
     undoBtn.addEventListener('click', undoStep);
@@ -90,7 +84,7 @@
   function setAvailable(v) {
     available = !!v;
     if (!available && isOpen) close();
-    if (editBtn) editBtn.hidden = !available || isOpen;
+    if (editBtn) editBtn.hidden = !available;
   }
 
   function open() {
@@ -102,7 +96,7 @@
     overlay = cctx.createImageData(w, h);
     isOpen = true;
     container.classList.add('mask-editing');
-    editBtn.hidden = true;
+    editBtn.setAttribute('aria-expanded', 'true');
     stage.hidden = toolbar.hidden = false;
     zoomInput.value = String(zoom);
     panMode = false; altHeld = false;
@@ -122,6 +116,8 @@
     container.classList.remove('mask-editing');
     stage.hidden = toolbar.hidden = cursor.hidden = true;
     editBtn.hidden = !available;
+    editBtn.setAttribute('aria-expanded', 'false');
+    toolbar.querySelector('details').open = false;
     editBtn.classList.toggle('mask-edited', !!editedMask);
     if (returnFocus && available) editBtn.focus();
   }
@@ -299,7 +295,7 @@
     else if (k === 'x' || k === 'X') setMode(mode === 'add' ? 'erase' : 'add');
     else if (k === '[') setRadius(radius / 1.2, false);
     else if (k === ']') setRadius(radius * 1.2 + 0.5, false);
-    else if (k === 'Escape' || (k === 'Enter' && (!t || t.tagName !== 'BUTTON'))) close();
+    else if (k === 'Escape' || (k === 'Enter' && (!t || (t.tagName !== 'BUTTON' && t.tagName !== 'SUMMARY')))) close();
     else return;
     e.preventDefault();
   }
@@ -335,7 +331,7 @@
     if (outputDirty) { outputDirty = false; rerenderStill(); }
   }
 
-  // The person keeps full colour with a teal edge; everything outside is dimmed to grey
+  // Keep the photo's original colour inside a white edge; dim everything outside.
   function drawOverlay() {
     const src = frame.data, out = overlay.data, n = w * h;
     for (let i = 0, p = 0; i < n; i++, p += 4) {
@@ -344,8 +340,8 @@
         const x = i % w;
         const edge = (x > 0 && !mask[i - 1]) || (x < w - 1 && !mask[i + 1]) ||
           (i >= w && !mask[i - w]) || (i < n - w && !mask[i + w]);
-        if (edge) { out[p] = ADD_RGB[0]; out[p + 1] = ADD_RGB[1]; out[p + 2] = ADD_RGB[2]; }
-        else { out[p] = r * 0.85 + ADD_RGB[0] * 0.15; out[p + 1] = g * 0.85 + ADD_RGB[1] * 0.15; out[p + 2] = b * 0.85 + ADD_RGB[2] * 0.15; }
+        if (edge) { out[p] = out[p + 1] = out[p + 2] = 255; }
+        else { out[p] = r; out[p + 1] = g; out[p + 2] = b; }
       } else {
         const l = (r * 0.3 + g * 0.59 + b * 0.11) * 0.3;
         out[p] = out[p + 1] = out[p + 2] = l;

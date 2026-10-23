@@ -32,10 +32,10 @@ Files:
 
 Choose **Camera** and **Start camera**, then **Freeze** when you like the picture, or choose **Upload** and select a photo.
 You can select a photo while background removal is loading; it processes automatically when ready. Loading and processing
-failures appear above the preview with **Try again**. Returning to Upload restores the saved photo and rebuilds its drawing.
+failures appear in the drawing panel with **Try again**. Returning to Upload restores the saved photo and rebuilds its drawing.
 
-On a frozen or uploaded photo, **Refine cutout** opens the brush. Highlighted areas stay in the drawing:
-**Keep** adds areas and **Remove** erases them. The toolbar stays below the photo. Use **View** to zoom to 2× or 4×,
+On a frozen or uploaded photo, **Edit cutout** in the top bar opens a second row of editing commands without resizing the photo.
+Bright areas stay in the drawing: **Keep** adds areas and **Remove** erases them. Use **View** to zoom to 2× or 4×,
 then **Move view** to drag around without painting. Pick Keep or Remove to paint again.
 
 **Done** keeps your edits and Undo history. **Reset** restores the automatic cutout and can itself be undone.
