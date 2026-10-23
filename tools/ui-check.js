@@ -40,14 +40,20 @@ const shots = process.env.UI_SHOTS;
     }
     await page.selectOption('#style-select', 'blueprint');
     await page.waitForFunction(() => !stillTask);
-    if (shots) { fs.mkdirSync(shots, { recursive: true }); await page.screenshot({ path: path.join(shots, '10-mask-edit-button.png') }); }
+    if (shots) { fs.mkdirSync(shots, { recursive: true }); await page.screenshot({ path: path.join(shots, '13-compact-toolbar.png') }); }
     console.log('PASS: all 12 styles render from the kept frame');
 
     const originalMask = await page.evaluate(() => Array.from(lastMask));
     const originalSVG = await page.evaluate(() => preview.dataset.svg);
+    const photoSize = () => page.locator('.video-container').evaluate(el => [el.clientWidth, el.clientHeight]);
+    const beforeEdit = await photoSize();
+    assert.ok(await page.locator('.controls').evaluate(el => el.clientHeight <= 36), 'compact desktop toolbar');
+    assert.equal(await page.locator('.status-bar').isVisible(), false, 'no ready-state commentary');
     await page.click('.mask-edit-btn');
-    const noOverlap = await page.evaluate(() => document.querySelector('.mask-tools').getBoundingClientRect().top >= document.querySelector('.video-container').getBoundingClientRect().bottom);
-    assert.equal(noOverlap, true);
+    assert.deepEqual(await photoSize(), beforeEdit, 'editing preserves photo dimensions');
+    assert.ok(await page.locator('.controls').evaluate(el => el.clientHeight <= 88), 'edit commands occupy one extra desktop row');
+    assert.equal(await page.locator('.mask-tools').evaluate(el => el.closest('.controls') !== null), true);
+    assert.equal(await page.locator('.mask-tools').evaluate(el => el.getBoundingClientRect().bottom <= document.querySelector('.viewport').getBoundingClientRect().top), true);
     await page.click('[data-mode="erase"]');
     const b = await page.locator('.mask-canvas').boundingBox();
     await page.mouse.move(b.x + b.width * .4, b.y + b.height * .4);
@@ -88,13 +94,27 @@ const shots = process.env.UI_SHOTS;
     console.log('PASS: zoomed strokes align, moving the view does not paint, Reset clears the edited marker and is undoable');
 
     await page.selectOption('[aria-label="Photo zoom"]', '1');
-    if (shots) await page.screenshot({ path: path.join(shots, '11-mask-brush-editing.png') });
-    for (const width of [390, 768, 1024]) {
+    if (shots) await page.screenshot({ path: path.join(shots, '14-toolbar-editing.png'), fullPage: true });
+    for (const width of [320, 390, 768, 1024, 1440]) {
+      await page.click('[data-act="done"]');
       await page.setViewportSize({ width, height: 844 });
       await page.waitForTimeout(150);
+      const before = await photoSize();
+      await page.click('.mask-edit-btn');
+      assert.deepEqual(await photoSize(), before, 'same photo size while editing at ' + width);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no horizontal overflow at ' + width);
-      assert.equal(await page.evaluate(() => document.querySelector('.mask-tools').getBoundingClientRect().top >= document.querySelector('.video-container').getBoundingClientRect().bottom), true, 'tools outside photo at ' + width);
-      if (shots && width === 390) await page.screenshot({ path: path.join(shots, '12-mask-brush-mobile.png'), fullPage: true });
+      assert.equal(await page.locator('.mask-tools').evaluate(el => el.getBoundingClientRect().bottom <= document.querySelector('.viewport').getBoundingClientRect().top), true, 'all edit commands above the photo at ' + width);
+      await page.locator('.mask-help summary').focus();
+      await page.keyboard.press('Enter');
+      assert.equal(await page.locator('.mask-help').evaluate(el => el.open), true, 'help opens from the keyboard');
+      assert.equal(await page.locator('.mask-help > div').evaluate(el => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; }), true, 'help stays on screen at ' + width);
+      assert.deepEqual(await photoSize(), before, 'help does not resize the photo');
+      await page.keyboard.press('Enter');
+      await page.click('.mask-edit-btn');
+      assert.equal(await page.locator('.mask-tools').isVisible(), false, 'Edit toggles the command row');
+      assert.deepEqual(await photoSize(), before);
+      await page.click('.mask-edit-btn');
+      if (shots && width === 390) await page.screenshot({ path: path.join(shots, '15-compact-mobile.png'), fullPage: true });
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.click('[data-act="done"]');
@@ -127,7 +147,11 @@ const shots = process.env.UI_SHOTS;
     await page.waitForFunction(() => isFrozen && !stillTask);
     assert.equal(await page.locator('#video').isVisible(), false);
     assert.equal(await page.locator('#frozen-frame').isVisible(), true);
-    await page.click('.mask-edit-btn'); await page.click('[data-act="done"]');
+    assert.equal(await page.locator('.status-bar').isVisible(), false, 'no frozen-photo commentary');
+    const frozenSize = await photoSize();
+    await page.click('.mask-edit-btn');
+    assert.deepEqual(await photoSize(), frozenSize, 'editing preserves frozen camera dimensions');
+    await page.click('[data-act="done"]');
     await page.click('#take-photo');
     await page.waitForFunction(() => !isFrozen && lastFrame);
     assert.equal(await page.locator('#video').isVisible(), true);

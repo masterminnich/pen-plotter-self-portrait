@@ -86,7 +86,7 @@ async function retryAction() {
 
 function clearPreview() {
   preview.dataset.svg = '';
-  preview.innerHTML = '<div class="empty-state"><span class="empty-mark" aria-hidden="true">✳</span><strong>Your drawing appears here</strong><p>Choose a photo, then explore the drawing styles.</p></div>';
+  preview.innerHTML = '<div class="empty-state"><p>Your drawing will appear here.</p></div>';
 }
 
 function updateUI() {
@@ -113,17 +113,15 @@ function updateUI() {
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-pressed', String(active));
   }
-  let message;
+  let message = '';
   if (appError) message = appError.message;
-  else if (modelState === 'loading') message = uploadedImage ? 'Photo selected. Loading background removal…' : 'Loading background removal… You can choose a photo while you wait.';
+  else if (modelState === 'loading') message = 'Loading background removal…';
   else if (cameraStarting !== null) message = 'Starting camera…';
   else if (sourceBusy !== null) message = 'Removing the background…';
-  else if (stillTask) message = 'Updating your drawing…';
-  else if (camera && stream) message = isFrozen ? 'Photo frozen. Refine the cutout or choose a drawing style.' : 'Camera is live. Freeze a photo when you’re ready.';
-  else if (!camera && lastFrame) message = 'Ready. Refine the cutout, explore styles, or download your drawing.';
-  else message = 'Start your camera or choose a photo to begin.';
+  else if (stillTask) message = 'Updating drawing…';
   const status = document.getElementById('app-status');
   if (status.textContent !== message) status.textContent = message;
+  status.parentElement.hidden = !message;
   status.parentElement.dataset.state = appError ? 'error' : (busy || modelState === 'loading' ? 'busy' : 'ready');
   document.getElementById('retry-action').hidden = !appError;
   updateMaskEditAvailability();
